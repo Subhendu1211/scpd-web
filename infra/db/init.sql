@@ -751,8 +751,3 @@ VALUES
   ('admin@example.com', '$2b$10$Jy.UKhPxdfWIkEcwZvG72.Jijn7rrOBefuumllr7/VRoh2OoZPxKC','superadmin')
 ON CONFLICT (email) DO NOTHING;
 
--- -----------------------------------------------------------------------------
--- Database connection settings
--- -----------------------------------------------------------------------------
-
-SELECT * FROM GRO;
