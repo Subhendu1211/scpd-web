@@ -1,0 +1,27 @@
+≡ƒÜÇ Starting Database Setup...
+Γ£à Connected to system database
+Γä╣∩╕Å Database scpdc already exists.
+Γ£à Connected to scpdc database
+Executing init.sql...
+Γ¥î Error during schema initialization: error: syntax error at or near "∩╗┐"
+    at C:\Projects\admin-t\scpd-web\backend\node_modules\pg\lib\client.js:545:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async setup (file:///C:/Projects/admin-t/scpd-web/backend/setup_database.js:53:5) {
+  length: 91,
+  severity: 'ERROR',
+  code: '42601',
+  detail: undefined,
+  hint: undefined,
+  position: '1',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'scan.l',
+  line: '1244',
+  routine: 'scanner_yyerror'
+}

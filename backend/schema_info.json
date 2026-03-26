@@ -1,0 +1,81 @@
+{
+  "columns": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "file_name",
+      "data_type": "text",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "original_name",
+      "data_type": "text",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "mime_type",
+      "data_type": "text",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "category",
+      "data_type": "text",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "size_bytes",
+      "data_type": "bigint",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "alt_text",
+      "data_type": "text",
+      "character_maximum_length": null,
+      "is_nullable": "YES"
+    },
+    {
+      "column_name": "storage_path",
+      "data_type": "text",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "file_bytes",
+      "data_type": "bytea",
+      "character_maximum_length": null,
+      "is_nullable": "YES"
+    },
+    {
+      "column_name": "uploaded_by",
+      "data_type": "integer",
+      "character_maximum_length": null,
+      "is_nullable": "YES"
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "character_maximum_length": null,
+      "is_nullable": "NO"
+    },
+    {
+      "column_name": "album_id",
+      "data_type": "integer",
+      "character_maximum_length": null,
+      "is_nullable": "YES"
+    }
+  ],
+  "categories": [
+    {
+      "def": "CHECK ((category = ANY (ARRAY['photo'::text, 'video'::text, 'newspaper'::text, 'audio'::text, 'carousel'::text])))"
+    }
+  ]
+}

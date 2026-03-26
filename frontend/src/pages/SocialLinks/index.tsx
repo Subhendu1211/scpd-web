@@ -1,0 +1,1 @@
+import React from "react"; export default function SocialLinks(){return <div className="card"><div className="card-body">Social Links</div></div>;}

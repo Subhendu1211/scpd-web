@@ -1,0 +1,1 @@
+import React from "react"; export default function Resources(){return <div className="card"><div className="card-body">Resources</div></div>;}

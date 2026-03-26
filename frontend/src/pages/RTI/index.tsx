@@ -1,0 +1,1 @@
+import React from "react"; export default function RTI(){return <div className="card"><div className="card-body">RTI</div></div>;}

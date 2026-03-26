@@ -1,0 +1,14 @@
+uploads/
+media/
+backend/uploads/
+backend/uploads/media/
+*.mp4
+*.zip
+*.pdf
+node_modules/
+dist/
+
+# Local environment files
+.env
+.env.*
+scpd-web/backend/.env

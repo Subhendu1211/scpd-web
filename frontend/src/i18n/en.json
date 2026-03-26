@@ -1,0 +1,191 @@
+﻿{
+  "nav": {
+    "home": "Home",
+    "about": {
+      "title": "About Us",
+      "commission": "About Commission",
+      "vision": "Vision/Mission",
+      "departments": "The Department",
+      "function": "Function",
+      "orgchart": "Organisation Chart",
+      "former": "Former State Commissioners",
+      "telephone": "Telephone Directory",
+      "activities": "Our Main Activities"
+    },
+    "acts": {
+      "title": "Act & Rules",
+      "disabilityActs": "Disability Acts",
+      "disabilityPolicies": "Disability Policies",
+      "disabilityRules": "Disability Rules",
+      "disabilityGuidelines": "Disability Guidelines",
+      "equalOpportunity": "Equal Opportunity Policy",
+      "handbook": "Handbook Concerning – Persons With Disabilities (Supreme Court of India)"
+    },
+    "publications": {
+      "title": "Publications",
+      "monthly": "Monthly Magazines",
+      "annual": "Annual Reports",
+      "success": "Success Stories",
+      "achievements": "Achievements",
+      "advertisement": "Advertisement"
+    },
+    "resources": {
+      "title": "Resources",
+      "notifications": "Notifications/Resolutions/Circulars/O.M.",
+      "tenders": "Tenders",
+      "related": "Related Websites",
+      "stateAdvisory": "State Advisory Board on Disability",
+      "icc": "Internal Complain Committee (ICC)",
+      "schemes": "Schemes & Programmes"
+    },
+    "grievances": {
+      "title": "Grievances/Cases",
+      "howTo": "How to Register a Complaint",
+      "register": "Register a Complaint",
+      "orders": "Orders of SCPD",
+      "interim": "Interim Orders of SCPD",
+      "causeList": "Cause List",
+      "pendency": "Pendency Status",
+      "suoMoto": "Suo-Motu Cases",
+      "landmark": "Landmark Court Judgments",
+      "faqs": "FAQs"
+    },
+    "rti": {
+      "title": "RTI",
+      "acts": "RTI Acts/Rules",
+      "info": "RTI Information Handbook",
+      "pio": "Public Information Officer",
+      "firstAppellate": "First Appellate Authority"
+    },
+    "gallery": {
+      "title": "Gallery",
+      "photos": "Photo Gallery",
+      "videos": "Video Gallery",
+      "news": "Newspaper Clipping",
+      "audio": "Audio Clipping"
+    },
+    "notice": "Notice Board",
+    "events": {
+      "title": "Events/Programmes",
+      "workshops": "Workshops/Awareness programmes",
+      "camp": "Camp Courts",
+      "quiz": "Quiz Competitions",
+      "sakhyama": "Sakhyama – An Ability Talk",
+      "campaign": "Disability Friendly Campaign"
+    },
+    "contact": {
+      "title": "Contact Us",
+      "office": "Office contact",
+      "dsso": "List of District Social Security Officers (DSSOs)",
+      "gro": "List of Grievance Redressal Officers (GROs)"
+    }
+  },
+  "header": {
+    "screenReader": "Screen Reader",
+    "stopReading": "Stop Reading",
+    "skipToContent": "Skip to Main Content",
+    "accessibility": "Accessibility",
+    "search": "Search",
+    "login": "LOGIN",
+    "searchPlaceholder": "Search",
+    "close": "Close",
+    "loginAs": "Choose To Login As",
+    "chooseRole": "",
+    "adminLogin": "Admin Login",
+    "legalOfficer": "Legal Login",
+    "userLogin": "User Login",
+    "adminDesc": "System administrator",
+    "legalDesc": "Legal Section access",
+    "userDesc": "Citizen / Public Access"
+  },
+  "officials": {
+    "ministerName": "Shri Nityananda Gond",
+    "ministerRole": "Cabinet Minister",
+    "secretaryName": "Shri Suresh Kumar Vashishth, IAS",
+    "secretaryRole": "Principal Secretary to Government\n SSEPD Department",
+    "commissionerName": " Smt. Bratati Harichandan, IAS, (Retd.)",
+    "commissionerRole": "State Commissioner for Persons with Disabilities, Odisha"
+  },
+  "branding": {
+    "title": "State Commissioner for Persons with Disabilities, Odisha",
+    "titleOdia": "ରାଜ୍ୟ ଭିନ୍ନକ୍ଷମ ଆୟୁକ୍ତ, ଓଡିଶା"
+  },
+  "cm": {
+    "name": "Shri Mohan Charan Majhi",
+    "role": "Hon’ble Chief Minister"
+  },
+  "langConfirm": {
+    "message": "Are you sure you want to change the language to Odia?",
+    "confirm": "Yes, Change",
+    "cancel": "Cancel"
+  },
+  "newsTicker": {
+    "label": "News",
+    "pause": "Pause",
+    "play": "Play"
+  },
+  "homepage": {
+    "scpdMessage": "SCPD's MESSAGE",
+    "readMore": "Read More",
+    "citizenServices": "Citizen Services",
+    "caseStatusCheck": "Case Status Check",
+    "whatsNew": "What's New",
+    "tenders": "Tenders",
+    "notifications": "Notifications",
+    "successStories": "Success Stories",
+    "successStoriesSummary": "Read inspiring stories and outcomes from across Odisha.",
+    "viewMore": "View More",
+    "aboutScpdBody1": "The Office of the State Commissioner for Persons with Disabilities (SCPD), Odisha, safeguards the rights and entitlements of persons with disabilities, monitors implementation of the RPwD Act, 2016, and facilitates accessibility, awareness, and grievance redressal across departments.",
+    "aboutScpdBody2": "The Commissioner inquires into complaints, issues recommendations for corrective action, and promotes an inclusive, barrier-free environment in built infrastructure, ICT, transport, and services.",
+    "visualHighlights": "Visual Highlights",
+    "photoGallery": "Photo Gallery",
+    "videoGallery": "Video Gallery",
+    "newspaperClippings": "Newspaper Clippings",
+    "noPhotos": "No photos available.",
+    "noNewsClippings": "No newspaper clippings available.",
+    "viewClipping": "View clipping",
+    "socialMediaTitle": "SOCIAL MEDIA",
+    "twitter": "Twitter",
+    "instagram": "Instagram",
+    "facebook": "Facebook",
+    "youtube": "YouTube",
+    "visit": "Visit",
+    "socialPreviewUnavailable": "In-app preview is not available for this platform.",
+    "openInNewTabHint": "Use the button below to open the official page in a new tab.",
+    "usefulLinksTitle": "USEFUL LINKS",
+    "visitWebsite": "Visit website (new tab)",
+    "swavlamban": "Swavlamban",
+    "depwd": "Department of Empowerment of PwDs",
+    "rci": "Rehabilitation Council of India",
+    "nimhr": "National Institute of Mental Health Rehabilitation",
+    "alimco": "ALIMCO",
+    "nationalTrust": "The National Trust",
+    "events": "EVENTS"
+  },
+  "footer": {
+    "contactLinks": "Contact & Links",
+    "contactUs": "Contact Us",
+    "feedback": "Feedback",
+    "help": "Help",
+    "sitemap": "Sitemap",
+    "viewOnMap": "View on Map",                                                                                                
+    "mapTitle": "Office location map",
+    "address": "A1 Block, Ground Floor, Toshali Bhawan, Satyanagar, Bhubaneswar, Odisha, India",
+    "policies": "Policies",
+    "copyright": "Copyright",
+    "disclaimer": "Disclaimer",
+    "hyperlinking": "Hyperlinking",
+    "privacy": "Privacy",
+    "terms": "Terms & Conditions",
+    "websitePolicies": "Website policies",
+    "accessibilityStatement": "Accessibility statement",
+    "governance": "Governance",
+    "webInfoManager": "Web Information Manager",
+    "visitorReports": "Visitor reports",
+    "followUs": "Follow Us",
+    "ownership": "Ownership",
+    "ownershipText": "Content owned by SCPD Odisha. Developed by Techsheel private limited Hosted by NIC/State DC.",
+    "scpdOdisha": "SCPD Odisha",
+    "lastUpdated": "Last updated"
+  }
+}
