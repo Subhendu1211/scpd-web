@@ -99,3 +99,11 @@ Base: `/api`
 - For tables, keep `limit` reasonable (<=500); define primary keys for row updates/deletes.
 - Colors expect hex like `#1b6dd1`; paths should start with `/`; slugs should be URL-friendly (a-z0-9-).
 - For SMS OTP in forgot-password (Twilio Verify), configure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID`.
+
+## Azure DB Setup (App Service)
+- No schema change is required; startup already runs `ensureBaseCmsSchema()` automatically.
+- Configure one of these in App Settings / Connection Strings:
+- `DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require`
+- `POSTGRES_CONNECTION_STRING=<same value as above>`
+- `POSTGRESQLCONNSTR_<name>` (Azure Connection Strings blade)
+- If you use separate vars, set: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` and (recommended on Azure) `PGSSLMODE=require`.

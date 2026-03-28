@@ -11,6 +11,7 @@ import { FaInstagramSquare } from "react-icons/fa";
 import { IoLogoYoutube } from "react-icons/io";
 import { FaSearch } from "react-icons/fa";
 import SiteSearch from "../SiteSearch";
+import { api } from "../../services/api";
 export default function HeaderBar() {
   const { t } = useTranslation();
   const [lang, setLang] = useState<"en" | "or">(() => {
@@ -297,10 +298,7 @@ export default function HeaderBar() {
     setAuthError("");
     setAuthSuccess("");
 
-    const apiBase =
-      ((import.meta as any)?.env?.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ||
-      "http://localhost:4000";
-    const endpoint = `${apiBase}/api/auth/${authMode === "login" ? "login" : "signup"}`;
+    const endpoint = `/auth/${authMode === "login" ? "login" : "signup"}`;
     const payload =
       authMode === "login"
         ? {
@@ -315,18 +313,7 @@ export default function HeaderBar() {
         };
 
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        const message = data?.error || "Authentication failed. Check your details.";
-        throw new Error(message);
-      }
+      const { data } = await api.post(endpoint, payload);
 
       if (data?.token) {
         localStorage.setItem("auth_token", data.token);
@@ -337,7 +324,11 @@ export default function HeaderBar() {
       // Optionally close modal after a short delay
       setTimeout(() => setOpenModal(false), 500);
     } catch (err: any) {
-      setAuthError(err?.message || "Authentication failed. Check your details.");
+      setAuthError(
+        err?.response?.data?.error ||
+        err?.message ||
+        "Authentication failed. Check your details.",
+      );
     } finally {
       setAuthLoading(false);
     }
