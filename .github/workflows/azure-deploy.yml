@@ -79,21 +79,17 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Prepare combined web app package (backend + frontend dist)
+      - name: Copy frontend build to backend/public
         run: |
-          rm -rf package
-          mkdir -p package
-          cp -R backend/. package/
-          rm -f package/.env package/.env.*
-          rm -rf package/public
-          mkdir -p package/public
-          cp -R frontend/dist/. package/public/
+          rm -rf backend/public
+          mkdir -p backend/public
+          cp -R frontend/dist/. backend/public/
 
-      - name: Upload web app package artifact
+      - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: webapp-package
-          path: package
+          name: node-app
+          path: backend
           if-no-files-found: error
 
   deploy:
@@ -101,21 +97,26 @@ jobs:
     needs: build
 
     steps:
-      - name: Download web app package artifact
+      - name: Download backend artifact
         uses: actions/download-artifact@v4
         with:
-          name: webapp-package
-          path: package
+          name: node-app
+          path: node-app
 
       - name: Extract app name from publish profile
         id: azure_app
         shell: bash
         env:
           AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
         run: |
           app_name="$(printf '%s' "$AZURE_WEBAPP_PUBLISH_PROFILE" | tr -d '\n' | sed -n 's/.*msdeploySite="\([^"]*\)".*/\1/p')"
+          if [ -z "$app_name" ] && [ -n "$AZURE_WEBAPP_NAME" ]; then
+            echo "Using AZURE_WEBAPP_NAME fallback from secret."
+            app_name="$AZURE_WEBAPP_NAME"
+          fi
           if [ -z "$app_name" ]; then
-            echo "Unable to extract msdeploySite from AZURE_WEBAPP_PUBLISH_PROFILE."
+            echo "Unable to extract msdeploySite from AZURE_WEBAPP_PUBLISH_PROFILE or AZURE_WEBAPP_NAME fallback."
             exit 1
           fi
           echo "app_name=$app_name" >> "$GITHUB_OUTPUT"
@@ -125,4 +126,5 @@ jobs:
         with:
           app-name: ${{ steps.azure_app.outputs.app_name }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: package
+          package: node-app/backend
+          slot-name: Production

@@ -161,6 +161,15 @@ const connectionHost = extractHostFromConnectionString(connectionString) || fall
 const fallbackSsl =
   resolveSslConfig({ host: connectionHost, connectionString }) || undefined;
 
+const resolvedDatabase =
+  parsedKeyValueConfig?.database || process.env.PGDATABASE || "scpd";
+console.debug("Postgres connection details:", {
+  host: connectionHost,
+  database: resolvedDatabase,
+  usingConnectionString: Boolean(connectionString),
+  ssl: Boolean(fallbackSsl),
+});
+
 export const pool =
   (parsedKeyValueConfig
     ? new Pool(parsedKeyValueConfig)
@@ -172,7 +181,7 @@ export const pool =
     : new Pool({
         host: fallbackHost,
         port: Number(process.env.PGPORT || 5432),
-        database: process.env.PGDATABASE || "scpd",
+        database: resolvedDatabase,
         user: process.env.PGUSER || "postgres",
         password: process.env.PGPASSWORD || "postgres",
         ...(fallbackSsl ? { ssl: fallbackSsl } : {}),

@@ -9,6 +9,6 @@ node_modules/
 dist/
 
 # Local environment files
-.env
-.env.*
-scpd-web/backend/.env
+# .env
+# .env.*
+# scpd-web/backend/.env
