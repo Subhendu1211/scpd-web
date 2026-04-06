@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>National Institute of Mental Health Rehabilitation (NIMHR), Sehore, (M.P.)</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            background-color:#e1ecff ;
+            font-family: "Noto Sans", sans-serif;
+            padding-bottom: 50px;
+        }
+        .container {
+            /* margin-top: 50px; */
+            text-align: center;
+        }
+        .announcement-header {
+            margin-bottom: 20px;
+        }
+        .announcement-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .announcement-header h3 {
+            font-size: 1.2rem;
+            color: #555;
+        }
+        .announcement-header p {
+            font-size: 1.1rem;
+            color: #474747;
+        }
+        .video-container {
+            margin-top: 30px;
+            margin-bottom: 40px;
+        }
+        iframe {
+            max-width: 100%;
+            border-radius: 10px;
+        }
+        .btn-custom {
+            background-color: #007bff;
+            color: #fff;
+            padding: 8px 16px;
+            font-size: 16px;
+            border-radius: 10px;
+            /* text-transform: uppercase; */
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+        .btn-custom:hover {
+            background-color: #0056b3;
+        }
+        @media (max-width: 500px){
+            .h1-logo{
+                font-size: 16px !important;
+            }
+            .announcement-header h1{
+                font-size: 1.2rem;
+            }
+            .announcement-header h3{
+                font-size: .9rem;
+            }
+            .announcement-header p{
+                font-size: .9rem;
+            }
+            .btn-custom{
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div>
+            <img style="width: 100px; margin-bottom: 20px;" src="./logo.web.png" alt="">
+            <h1 style="font-size: 20px; margin-bottom: 20px; color: #087e39; font-weight: 700;" class="h1-logo">National Institute of Mental Health Rehabilitation (NIMHR), Sehore, (M.P.)</h1>
+        </div>
+        <div class="announcement-header">
+            <h1>We are excited to announce</h1>
+            <h3>the launch of our new website inaugurated by</h3>
+            <h1>Shri B.L. Verma</h1>
+            <p>Hon'ble Minister of State for Social Justice</p>
+            <p>on 23rd September 2024</p>
+        </div>
+
+        <div class="video-container">
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/EpR4jUO5JNo" 
+            frameborder="0" allowfullscreen></iframe>
+        </div>
+
+        <p>Please visit our new website by clicking the link below:</p>
+        <a href="https://nimhr.nic.in/" target="_blank" class="btn btn-custom">Go to New Website
+            <p style="text-decoration: underline;" class="mb-0">nimhr.nic.in</p>
+        </a>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
