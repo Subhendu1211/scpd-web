@@ -23,17 +23,29 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: npm install, build, and test
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Copy frontend build to backend/public
         run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
+          rm -rf backend/public
+          mkdir -p backend/public
+          cp -r frontend/dist/* backend/public/
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: backend
 
   deploy:
     runs-on: ubuntu-latest
@@ -61,5 +73,5 @@ jobs:
         with:
           app-name: 'scpd-web'
           slot-name: 'Production'
-          package: .
+          package: backend
           
