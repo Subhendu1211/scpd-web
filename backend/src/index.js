@@ -108,15 +108,20 @@ app.use((err, _req, res, _next) => {
 
 const PORT = process.env.PORT || 4000;
 
-(async () => {
-  await ensureBaseCmsSchema();
-  await ensureCmsMediaCategoryConstraint();
-  await ensureCmsMediaFileBytesColumn();
-  await ensureCmsMediaCaptionTextColorColumn();
-  app.listen(PORT, () =>
-    console.log(`API listening on http://localhost:${PORT}`),
-  );
-})().catch((error) => {
-  console.error("Unable to start API server", error);
-  process.exit(1);
+app.listen(PORT, () => {
+  console.log(`API listening on http://localhost:${PORT}`);
 });
+
+// Run schema/bootstrap tasks in background.
+// In cloud environments, hard-failing process startup causes generic App Service
+// "Application Error" pages. We keep the server online and log bootstrap issues.
+(async () => {
+  try {
+    await ensureBaseCmsSchema();
+    await ensureCmsMediaCategoryConstraint();
+    await ensureCmsMediaFileBytesColumn();
+    await ensureCmsMediaCaptionTextColorColumn();
+  } catch (error) {
+    console.error("Startup bootstrap warning (server still running):", error);
+  }
+})();

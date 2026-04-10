@@ -5,7 +5,22 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const INIT_SQL_PATH = path.resolve(__dirname, "../../../infra/db/init.sql");
+
+function resolveInitSqlPath() {
+  const candidates = [
+    // Monorepo layout: backend/src/models -> repo/infra/db/init.sql
+    path.resolve(__dirname, "../../../infra/db/init.sql"),
+    // Optional deployed layout fallback if infra is copied near backend
+    path.resolve(__dirname, "../../infra/db/init.sql"),
+    // Optional local fallback if init is bundled into backend/db
+    path.resolve(__dirname, "../../db/init.sql"),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
 
 function quoteIdent(identifier) {
   return `"${String(identifier).replace(/"/g, '""')}"`;
@@ -113,13 +128,17 @@ export async function ensureBaseCmsSchema() {
     const hasPages = Boolean(rows?.[0]?.has_pages);
 
     if (!(hasMenu && hasMedia && hasNews && hasPages)) {
-      if (!fs.existsSync(INIT_SQL_PATH)) {
-        throw new Error(`DB bootstrap file not found: ${INIT_SQL_PATH}`);
+      const initSqlPath = resolveInitSqlPath();
+      if (!initSqlPath) {
+        console.warn(
+          "DB bootstrap file not found; skipping auto-schema bootstrap.",
+        );
+        return;
       }
 
-      const initSql = fs.readFileSync(INIT_SQL_PATH, "utf8");
+      const initSql = fs.readFileSync(initSqlPath, "utf8");
       await client.query(initSql);
-      console.log("Ensured base CMS schema from infra/db/init.sql");
+      console.log(`Ensured base CMS schema from ${initSqlPath}`);
     }
 
     await ensurePublishedCmsPages(client);
