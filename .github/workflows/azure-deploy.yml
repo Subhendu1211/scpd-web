@@ -103,6 +103,22 @@ jobs:
           name: node-app
           path: node-app
 
+      - name: Resolve deploy package path
+        id: resolve_package
+        shell: bash
+        run: |
+          if [ -f "node-app/package.json" ]; then
+            echo "package_path=node-app" >> "$GITHUB_OUTPUT"
+          elif [ -f "node-app/backend/package.json" ]; then
+            echo "package_path=node-app/backend" >> "$GITHUB_OUTPUT"
+          else
+            echo "Could not find package.json in node-app or node-app/backend"
+            echo "Downloaded tree:"
+            ls -la node-app || true
+            find node-app -maxdepth 3 -type f | head -100
+            exit 1
+          fi
+
       - name: Extract app name from publish profile
         id: azure_app
         shell: bash
@@ -126,5 +142,5 @@ jobs:
         with:
           app-name: ${{ steps.azure_app.outputs.app_name }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: node-app/backend
+          package: ${{ steps.resolve_package.outputs.package_path }}
           slot-name: Production
