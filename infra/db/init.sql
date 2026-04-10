@@ -3,8 +3,8 @@
 -- -----------------------------------------------------------------------------
 
 -- Extensions commonly used by app code (UUIDs, crypto)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Azure Database for PostgreSQL does not allow uuid-ossp or pgcrypto for this user.
+-- UUID values are generated in application code instead of via DB extensions.
 
 CREATE TABLE IF NOT EXISTS grievances (
   id SERIAL PRIMARY KEY,

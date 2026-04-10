@@ -79,6 +79,11 @@ function resolveSslConfig({ host, connectionString }) {
 
   if (isLocalHost(host)) return false;
 
+  // Enable SSL for Azure Postgres databases
+  if (host && (host.includes("azure.com") || host.includes("database.azure.com"))) {
+    return { rejectUnauthorized: false };
+  }
+
   // Safe default for managed DBs (Azure, etc.) in production.
   if (process.env.NODE_ENV === "production") {
     return { rejectUnauthorized: false };
@@ -156,13 +161,13 @@ const connectionString =
 
 const parsedKeyValueConfig = parseKeyValueConnectionString(connectionString);
 
-const fallbackHost = process.env.PGHOST || "localhost";
+const fallbackHost = process.env.DB_HOST || process.env.PGHOST || "localhost";
 const connectionHost = extractHostFromConnectionString(connectionString) || fallbackHost;
 const fallbackSsl =
   resolveSslConfig({ host: connectionHost, connectionString }) || undefined;
 
 const resolvedDatabase =
-  parsedKeyValueConfig?.database || process.env.PGDATABASE || "scpd";
+  parsedKeyValueConfig?.database || process.env.DB_NAME || process.env.PGDATABASE || "scpd";
 console.debug("Postgres connection details:", {
   host: connectionHost,
   database: resolvedDatabase,
@@ -180,9 +185,9 @@ export const pool =
       })
     : new Pool({
         host: fallbackHost,
-        port: Number(process.env.PGPORT || 5432),
+        port: Number(process.env.DB_PORT || process.env.PGPORT || 5432),
         database: resolvedDatabase,
-        user: process.env.PGUSER || "postgres",
-        password: process.env.PGPASSWORD || "postgres",
+        user: process.env.DB_USER || process.env.PGUSER || "postgres",
+        password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres",
         ...(fallbackSsl ? { ssl: fallbackSsl } : {}),
       }));

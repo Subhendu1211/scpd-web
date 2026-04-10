@@ -1,14 +1,17 @@
 import pg from "pg";
+import dotenv from "dotenv";
+
+dotenv.config();
 const { Client } = pg;
 
 async function checkTables() {
-  console.log("Checking tables in scpd_cms on port 55400...");
+  console.log("Checking tables in scpd_cms using environment configuration...");
   const client = new Client({
-    host: "localhost",
-    port: 55400,
-    user: "postgres",
-    password: "postgres",
-    database: "scpd_cms",
+    host: process.env.DB_HOST || process.env.PGHOST || "localhost",
+    port: Number(process.env.DB_PORT || process.env.PGPORT || 55400),
+    user: process.env.DB_USER || process.env.PGUSER || "postgres",
+    password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres",
+    database: process.env.DB_NAME || process.env.PGDATABASE || "scpd_cms",
   });
   try {
     await client.connect();

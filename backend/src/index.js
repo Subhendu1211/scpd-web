@@ -21,10 +21,11 @@ dotenv.config();
 // Debug: print DB environment so we can verify which Postgres instance we're using
 try {
   console.debug("DB env:", {
-    PGDATABASE: process.env.PGDATABASE,
-    PGHOST: process.env.PGHOST,
-    PGPORT: process.env.PGPORT,
-    PGUSER: process.env.PGUSER,
+    DB_NAME: process.env.DB_NAME || process.env.PGDATABASE,
+    DB_HOST: process.env.DB_HOST || process.env.PGHOST,
+    DB_PORT: process.env.DB_PORT || process.env.PGPORT,
+    DB_USER: process.env.DB_USER || process.env.PGUSER,
+    DB_SSL: process.env.DB_SSL,
   });
 } catch (e) {
   /* ignore */

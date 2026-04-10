@@ -7,11 +7,11 @@ const { Client } = pg;
 async function checkPort(port, label) {
   console.log(`\n--- Checking Port ${port} (${label}) ---`);
   const client = new Client({
-    host: "localhost",
-    port: port,
-    user: "postgres",
-    password: process.env.PGPASSWORD || "postgres",
-    database: "postgres",
+    host: process.env.DB_HOST || process.env.PGHOST || "localhost",
+    port: Number(process.env.DB_PORT || process.env.PGPORT || port),
+    user: process.env.DB_USER || process.env.PGUSER || "postgres",
+    password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres",
+    database: process.env.DB_NAME || process.env.PGDATABASE || "postgres",
   });
 
   try {
@@ -34,8 +34,9 @@ async function checkPort(port, label) {
 
 async function run() {
   console.log("--- Environment Variables ---");
-  console.log("PGPORT:", process.env.PGPORT);
-  console.log("PGDATABASE:", process.env.PGDATABASE);
+  console.log("DB_HOST:", process.env.DB_HOST || process.env.PGHOST);
+  console.log("DB_PORT:", process.env.DB_PORT || process.env.PGPORT);
+  console.log("DB_NAME:", process.env.DB_NAME || process.env.PGDATABASE);
   console.log("DATABASE_URL:", process.env.DATABASE_URL || "(not set)");
 
   await checkPort(5432, "Default");

@@ -44,11 +44,11 @@ async function run() {
   const heroUrl = `/uploads/media/${latest}`;
 
   const client = new Client({
-    host: process.env.PGHOST || "localhost",
-    port: Number(process.env.PGPORT || 5432),
-    user: process.env.PGUSER || "postgres",
-    password: process.env.PGPASSWORD || "postgres",
-    database: process.env.PGDATABASE || "scpdc"
+    host: process.env.DB_HOST || process.env.PGHOST || "localhost",
+    port: Number(process.env.DB_PORT || process.env.PGPORT || 5432),
+    user: process.env.DB_USER || process.env.PGUSER || "postgres",
+    password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres",
+    database: process.env.DB_NAME || process.env.PGDATABASE || "scpdc"
   });
 
   await client.connect();

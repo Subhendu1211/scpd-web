@@ -10,13 +10,13 @@ const { Client } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DB_CONFIG = {
-  host: process.env.PGHOST || "localhost",
-  port: Number(process.env.PGPORT || 5432),
-  user: process.env.PGUSER || "postgres",
-  password: process.env.PGPASSWORD || "postgres",
+  host: process.env.DB_HOST || process.env.PGHOST || "localhost",
+  port: Number(process.env.DB_PORT || process.env.PGPORT || 5432),
+  user: process.env.DB_USER || process.env.PGUSER || "postgres",
+  password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres",
 };
 
-const TARGET_DB = process.env.PGDATABASE || "scpdc";
+const TARGET_DB = process.env.DB_NAME || process.env.PGDATABASE || "scpdc";
 
 async function setup() {
   console.log("🚀 Starting Database Setup...");

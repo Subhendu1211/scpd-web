@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { pool } from "../models/db.js";
 
@@ -23,11 +24,12 @@ export async function signupPublicUser({ fullName, email, phone, password }) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const newUserId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}`;
     const insert = await client.query(
-      `INSERT INTO public_users (full_name, email, phone, password_hash)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, full_name, email, phone, created_at` ,
-      [fullName.trim(), normalizedEmail, phone?.trim() || null, passwordHash]
+      `INSERT INTO public_users (id, full_name, email, phone, password_hash)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, full_name, email, phone, created_at`,
+      [newUserId, fullName.trim(), normalizedEmail, phone?.trim() || null, passwordHash]
     );
 
     const newUser = insert.rows[0];

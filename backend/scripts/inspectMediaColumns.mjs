@@ -4,11 +4,11 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const pool = new pg.Pool({
-  host: process.env.PGHOST || "localhost",
-  port: Number(process.env.PGPORT || 5432),
-  database: process.env.PGDATABASE || "scpdc",
-  user: process.env.PGUSER || "postgres",
-  password: process.env.PGPASSWORD || "secret"
+  host: process.env.DB_HOST || process.env.PGHOST || "localhost",
+  port: Number(process.env.DB_PORT || process.env.PGPORT || 5432),
+  database: process.env.DB_NAME || process.env.PGDATABASE || "scpdc",
+  user: process.env.DB_USER || process.env.PGUSER || "postgres",
+  password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres"
 });
 
 try {

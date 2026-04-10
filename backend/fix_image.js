@@ -5,11 +5,11 @@ import path from 'path';
 dotenv.config();
 
 const pool = new pg.Pool({
-    host: process.env.PGHOST || 'localhost',
-    port: process.env.PGPORT || 5432,
-    user: process.env.PGUSER || 'postgres',
-    password: process.env.PGPASSWORD || 'postgres',
-    database: process.env.PGDATABASE || 'scpd'
+    host: process.env.DB_HOST || process.env.PGHOST || 'localhost',
+    port: process.env.DB_PORT || process.env.PGPORT || 5432,
+    user: process.env.DB_USER || process.env.PGUSER || 'postgres',
+    password: process.env.DB_PASS || process.env.PGPASSWORD || 'postgres',
+    database: process.env.DB_NAME || process.env.PGDATABASE || 'scpd'
 });
 
 async function run() {

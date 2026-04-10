@@ -1,6 +1,6 @@
 -- Public user auth
 CREATE TABLE IF NOT EXISTS public_users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY,
   full_name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   phone TEXT,

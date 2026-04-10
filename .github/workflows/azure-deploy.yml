@@ -45,21 +45,21 @@ jobs:
       - name: Ensure backend base schema
         working-directory: backend
         env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGDATABASE: scpd
-          PGUSER: postgres
-          PGPASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: scpd
+          DB_USER: postgres
+          DB_PASS: postgres
         run: node --input-type=module -e "import { ensureBaseCmsSchema } from './src/models/ensureSchema.js'; await ensureBaseCmsSchema();"
 
       - name: Run backend schema checks
         working-directory: backend
         env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGDATABASE: scpd
-          PGUSER: postgres
-          PGPASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: scpd
+          DB_USER: postgres
+          DB_PASS: postgres
         run: |
           node scripts/check_defaults.js
           node scripts/check_media_schema.js

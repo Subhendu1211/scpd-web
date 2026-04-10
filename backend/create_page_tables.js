@@ -5,13 +5,13 @@ dotenv.config();
 const { Client } = pg;
 
 async function createMissingTable() {
-  console.log("Creating cms_page_tables table...");
+  console.log("Creating cms_page_tables table using environment configuration...");
   const client = new Client({
-    host: "localhost",
-    port: 55400,
-    user: "postgres",
-    password: "postgres",
-    database: "scpdc",
+    host: process.env.DB_HOST || process.env.PGHOST || "localhost",
+    port: Number(process.env.DB_PORT || process.env.PGPORT || 55400),
+    user: process.env.DB_USER || process.env.PGUSER || "postgres",
+    password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres",
+    database: process.env.DB_NAME || process.env.PGDATABASE || "scpdc",
   });
 
   try {
