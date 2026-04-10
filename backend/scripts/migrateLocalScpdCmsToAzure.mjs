@@ -63,14 +63,18 @@ async function getPublicTables(client) {
 async function getTableColumns(client, table) {
   const { rows } = await client.query(
     `
-      SELECT column_name
+      SELECT
+        column_name,
+        data_type,
+        udt_name,
+        is_nullable
       FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = $1
       ORDER BY ordinal_position;
     `,
     [table]
   );
-  return rows.map((r) => r.column_name);
+  return rows;
 }
 
 async function getForeignKeyEdges(client, candidateTables) {
@@ -165,10 +169,57 @@ async function resetSequences(targetClient, table) {
   }
 }
 
-async function copyTableData(sourceClient, targetClient, table, commonColumns) {
-  if (!commonColumns.length) return { inserted: 0 };
+function isTextLike(udt) {
+  return ["text", "varchar", "bpchar", "citext"].includes(udt);
+}
 
-  const colList = commonColumns.map(q).join(", ");
+function isNumericLike(udt) {
+  return ["int2", "int4", "int8", "numeric", "float4", "float8"].includes(udt);
+}
+
+function isTemporalLike(udt) {
+  return ["date", "timestamp", "timestamptz", "time", "timetz"].includes(udt);
+}
+
+function isJsonLike(udt) {
+  return ["json", "jsonb"].includes(udt);
+}
+
+function isCompatibleType(sourceUdt, targetUdt) {
+  if (sourceUdt === targetUdt) return true;
+  if (isTextLike(sourceUdt) && isTextLike(targetUdt)) return true;
+  if (isNumericLike(sourceUdt) && isNumericLike(targetUdt)) return true;
+  if (isTemporalLike(sourceUdt) && isTemporalLike(targetUdt)) return true;
+  if (isJsonLike(sourceUdt) && isJsonLike(targetUdt)) return true;
+  if (isTextLike(sourceUdt) && isJsonLike(targetUdt)) return true;
+  if (isJsonLike(sourceUdt) && isTextLike(targetUdt)) return true;
+  return false;
+}
+
+function transformValue(value, sourceUdt, targetUdt) {
+  if (value == null) return null;
+  if (isJsonLike(targetUdt)) {
+    if (typeof value === "object") return value;
+    if (typeof value === "string") {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+    return value;
+  }
+  if (isTextLike(targetUdt) && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return value;
+}
+
+async function copyTableData(sourceClient, targetClient, table, mappedColumns) {
+  if (!mappedColumns.length) return { inserted: 0 };
+
+  const sourceColumnNames = mappedColumns.map((c) => c.column_name);
+  const colList = sourceColumnNames.map(q).join(", ");
   const sourceSql = `SELECT ${colList} FROM ${tableRef("public", table)};`;
   const sourceRes = await sourceClient.query(sourceSql);
   const rows = sourceRes.rows;
@@ -181,9 +232,9 @@ async function copyTableData(sourceClient, targetClient, table, commonColumns) {
     const batch = rows.slice(i, i + batchSize);
     const values = [];
     const placeholders = batch.map((row, rowIdx) => {
-      const base = rowIdx * commonColumns.length;
-      const inner = commonColumns.map((col, colIdx) => {
-        values.push(row[col]);
+      const base = rowIdx * mappedColumns.length;
+      const inner = mappedColumns.map((col, colIdx) => {
+        values.push(transformValue(row[col.column_name], col.source_udt, col.target_udt));
         return `$${base + colIdx + 1}`;
       });
       return `(${inner.join(", ")})`;
@@ -284,30 +335,69 @@ async function migrate() {
     }
 
     const stats = [];
-    for (const table of orderedTables) {
+    for (let idx = 0; idx < orderedTables.length; idx += 1) {
+      const table = orderedTables[idx];
       const sourceCols = await getTableColumns(sourceClient, table);
       const targetCols = await getTableColumns(targetClient, table);
-      const targetColSet = new Set(targetCols);
-      const commonCols = sourceCols.filter((c) => targetColSet.has(c));
+      const targetByName = new Map(targetCols.map((c) => [c.column_name, c]));
+      const mappedCols = [];
+      const incompatibleCols = [];
 
-      if (!commonCols.length) {
+      for (const sourceCol of sourceCols) {
+        const targetCol = targetByName.get(sourceCol.column_name);
+        if (!targetCol) continue;
+        if (!isCompatibleType(sourceCol.udt_name, targetCol.udt_name)) {
+          incompatibleCols.push(
+            `${sourceCol.column_name} (${sourceCol.udt_name} -> ${targetCol.udt_name})`
+          );
+          continue;
+        }
+        mappedCols.push({
+          column_name: sourceCol.column_name,
+          source_udt: sourceCol.udt_name,
+          target_udt: targetCol.udt_name,
+        });
+      }
+
+      if (incompatibleCols.length) {
+        console.warn(`Skipping incompatible columns in ${table}: ${incompatibleCols.join(", ")}`);
+      }
+
+      if (!mappedCols.length) {
         console.warn(`Skipping ${table}: no common columns found.`);
         stats.push({ table, inserted: 0, skipped: true });
         continue;
       }
 
-      const { inserted } = await copyTableData(sourceClient, targetClient, table, commonCols);
-      await resetSequences(targetClient, table);
-      stats.push({ table, inserted, skipped: false });
-      console.log(`Copied ${inserted} rows -> ${table}`);
+      const savepoint = `sp_${idx + 1}`;
+      await targetClient.query(`SAVEPOINT ${savepoint}`);
+      try {
+        const { inserted } = await copyTableData(sourceClient, targetClient, table, mappedCols);
+        await resetSequences(targetClient, table);
+        await targetClient.query(`RELEASE SAVEPOINT ${savepoint}`);
+        stats.push({ table, inserted, skipped: false });
+        console.log(`Copied ${inserted} rows -> ${table}`);
+      } catch (tableError) {
+        await targetClient.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+        await targetClient.query(`RELEASE SAVEPOINT ${savepoint}`);
+        stats.push({ table, inserted: 0, skipped: true, error: tableError.message });
+        console.warn(`Skipped ${table}: ${tableError.message}`);
+      }
     }
 
     await targetClient.query("COMMIT");
 
     const totalRows = stats.reduce((sum, s) => sum + s.inserted, 0);
+    const skippedTables = stats.filter((s) => s.skipped);
     console.log("Migration completed.");
     console.log(`Tables processed: ${stats.length}`);
     console.log(`Total rows copied: ${totalRows}`);
+    console.log(`Skipped tables: ${skippedTables.length}`);
+    for (const skipped of skippedTables) {
+      if (skipped.error) {
+        console.log(`  - ${skipped.table}: ${skipped.error}`);
+      }
+    }
   } catch (error) {
     try {
       await targetClient.query("ROLLBACK");
