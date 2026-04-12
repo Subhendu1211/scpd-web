@@ -3,6 +3,7 @@ import CmsContent from "../../../components/common/CmsContent";
 import EventProgramCards from "../../../components/common/EventProgramCards";
 import { useCmsPage } from "../../../hooks/useCmsPage";
 import { useCmsTable } from "../../../hooks/useCmsTable";
+import { extractEventPhotos } from "../../../utils/eventMedia";
 import EventLayout from "@pages/Events/EventsLayout";
 
 export default function Workshop() {
@@ -14,7 +15,7 @@ export default function Workshop() {
     const rows = Array.isArray(table?.rows) ? table.rows : [];
     return rows.map((row: any, idx: number) => {
       const title = row.title || row.name || row.caption || `Workshop ${idx + 1}`;
-      const photoList = extractWorkshopPhotos(row as Record<string, unknown>);
+      const photoList = extractEventPhotos(row as Record<string, unknown>);
       const image = photoList[0] || "";
       const location = row.location || row.venue || "";
       const startDate = row.start_date || row.startDate || row.date || "";
