@@ -73,6 +73,38 @@ interface CmsPageApiResponse {
   commonAttachmentsCaption?: string | null;
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return normalizeStringArray(parsed);
+      } catch {
+        return [trimmed];
+      }
+    }
+    return [trimmed];
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>)
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 function normalizeCmsRecord(record: CmsPageApiResponse): CmsPageRecord {
   return {
     id: record.id,
@@ -80,10 +112,10 @@ function normalizeCmsRecord(record: CmsPageApiResponse): CmsPageRecord {
     summary: record.summary ?? null,
     body: record.body ?? "",
     heroImagePath: record.heroImagePath ?? null,
-    heroImagePaths: record.heroImagePaths ?? [],
-    heroImageCaptions: record.heroImageCaptions ?? [],
-    attachmentsPaths: record.attachmentsPaths ?? [],
-    attachmentsCaptions: record.attachmentsCaptions ?? [],
+    heroImagePaths: normalizeStringArray(record.heroImagePaths),
+    heroImageCaptions: normalizeStringArray(record.heroImageCaptions),
+    attachmentsPaths: normalizeStringArray(record.attachmentsPaths),
+    attachmentsCaptions: normalizeStringArray(record.attachmentsCaptions),
     publishedAt: record.publishedAt ?? null,
     showPublishDate: Boolean(record.showPublishDate),
     updatedAt: record.updatedAt ?? null,

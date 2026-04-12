@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { CmsPageRecord } from "../../services/cms";
 import { markdownToHtml } from "../../utils/markdown";
 import { Typography } from "@mui/material";
@@ -93,25 +93,18 @@ export default function CmsContent({
     );
   }
 
-  const bodyText = useMemo(() => {
-    const raw = page.body || "";
-    if (!collapseSingleLineBreaks) {
-      return raw;
-    }
+  const rawBody = page.body || "";
+  const bodyText = collapseSingleLineBreaks
+    ? rawBody
+        .replace(/\r\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/([^\n])\n(?=[^\n])/g, "$1 ")
+    : rawBody;
 
-    return raw
-      .replace(/\r\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .replace(/([^\n])\n(?=[^\n])/g, "$1 ");
-  }, [page.body, collapseSingleLineBreaks]);
-
-  const html = useMemo(() => {
-    const looksLikeRichHtml = /<\/?[a-z][\s\S]*>/i.test(bodyText);
-    if (looksLikeRichHtml) {
-      return DOMPurify.sanitize(bodyText);
-    }
-    return markdownToHtml(bodyText);
-  }, [bodyText]);
+  const looksLikeRichHtml = /<\/?[a-z][\s\S]*>/i.test(bodyText);
+  const html = looksLikeRichHtml
+    ? DOMPurify.sanitize(bodyText)
+    : markdownToHtml(bodyText);
   const layoutStyle: React.CSSProperties = (() => {
     const base: React.CSSProperties = {};
     if (page.fontFamily) base.fontFamily = page.fontFamily;
