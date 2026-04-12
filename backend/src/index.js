@@ -86,6 +86,16 @@ app.get("/uploads/media/:fileName", async (req, res) => {
   }
 });
 
+// SPA fallback for frontend routes on production host (e.g. /events/workshops-awareness).
+// Keep API and uploads routes out of this fallback.
+app.get(/^\/(?!api(?:\/|$)|uploads(?:\/|$)).*/, (_req, res, next) => {
+  const indexPath = path.join(__dirname, "..", "public", "index.html");
+  if (!indexPath) return next();
+  return res.sendFile(indexPath, (err) => {
+    if (err) next(err);
+  });
+});
+
 app.use((err, _req, res, _next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {

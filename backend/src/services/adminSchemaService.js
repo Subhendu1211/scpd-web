@@ -8,6 +8,41 @@ const REGISTRY_TABLE = "cms_dynamic_tables";
 const PUBLIC_SCHEMA = "public";
 const UPLOADS_DIR = path.resolve(process.cwd(), "uploads", "media");
 
+function inferMediaMimeType(targetName, providedMimeType) {
+  const mime = String(providedMimeType || "").trim().toLowerCase();
+  if (mime) return mime;
+
+  const ext = path.extname(targetName).toLowerCase();
+  const byExt = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+    ".pdf": "application/pdf",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt": "text/plain",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  };
+  return byExt[ext] || "application/octet-stream";
+}
+
+function inferMediaCategory(mimeType) {
+  const mime = String(mimeType || "").toLowerCase();
+  if (mime.startsWith("image/")) return "photo";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  // Keep documents in an allowed category that still passes existing DB constraint.
+  return "newspaper";
+}
+
 function quoteIdent(identifier) {
   // Identifiers are validated by IDENTIFIER_REGEX before reaching SQL.
   // This is still defensive and prevents accidental breakage.
@@ -1035,6 +1070,39 @@ export async function uploadCmsFile(file) {
   const targetPath = path.join(UPLOADS_DIR, targetName);
 
   await fs.promises.rename(file.path, targetPath);
+
+  // Persist uploaded binary in cms_media as a fallback source so files survive
+  // stateless deployments where local filesystem artifacts are not retained.
+  try {
+    const fileBytes = await fs.promises.readFile(targetPath);
+    const mimeType = inferMediaMimeType(targetName, file.mimetype);
+    const category = inferMediaCategory(mimeType);
+
+    await pool.query(
+      `INSERT INTO cms_media (
+         file_name, original_name, mime_type, category, size_bytes, storage_path, file_bytes, alt_text, uploaded_by
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL)
+       ON CONFLICT (file_name) DO UPDATE
+       SET original_name = EXCLUDED.original_name,
+           mime_type = EXCLUDED.mime_type,
+           category = EXCLUDED.category,
+           size_bytes = EXCLUDED.size_bytes,
+           storage_path = EXCLUDED.storage_path,
+           file_bytes = EXCLUDED.file_bytes`,
+      [
+        targetName,
+        file.originalname || targetName,
+        mimeType,
+        category,
+        Number(file.size || fileBytes.length || 0),
+        targetPath,
+        fileBytes,
+      ],
+    );
+  } catch (error) {
+    console.warn("cms upload fallback persistence failed:", error?.message || error);
+  }
 
   const url = `/uploads/media/${targetName}`;
   return {
