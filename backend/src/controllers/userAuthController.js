@@ -1,5 +1,9 @@
 import { validationResult } from "express-validator";
-import { authenticatePublicUser, signupPublicUser } from "../services/userAuthService.js";
+import {
+  authenticatePublicUser,
+  signupPublicUser,
+  verifyPublicUserLoginOtp,
+} from "../services/userAuthService.js";
 
 export async function signup(req, res) {
   const errors = validationResult(req);
@@ -25,14 +29,32 @@ export async function login(req, res) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { email, password } = req.body;
+  const { email, password, channel } = req.body;
   try {
-    const result = await authenticatePublicUser({ email, password });
+    const result = await authenticatePublicUser({ email, password, channel });
     if (!result) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
     return res.json(result);
   } catch (_err) {
     return res.status(500).json({ error: "Unable to authenticate" });
+  }
+}
+
+export async function verifyLoginOtp(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { challengeId, otp } = req.body;
+  try {
+    const result = await verifyPublicUserLoginOtp({ challengeId, otp });
+    if (!result) {
+      return res.status(400).json({ error: "Invalid or expired OTP" });
+    }
+    return res.json(result);
+  } catch (_err) {
+    return res.status(500).json({ error: "Unable to verify OTP" });
   }
 }

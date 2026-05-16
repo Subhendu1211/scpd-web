@@ -1,6 +1,11 @@
 import pg from "pg";
 import dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env") });
 const { Pool } = pg;
 
 function isTruthy(value) {
@@ -175,7 +180,7 @@ console.debug("Postgres connection details:", {
   ssl: Boolean(fallbackSsl),
 });
 
-export const pool =
+const pool =
   (parsedKeyValueConfig
     ? new Pool(parsedKeyValueConfig)
     : connectionString
@@ -191,3 +196,10 @@ export const pool =
         password: process.env.DB_PASS || process.env.PGPASSWORD || "postgres",
         ...(fallbackSsl ? { ssl: fallbackSsl } : {}),
       }));
+
+// Keep process alive when idle pooled connections are reset by managed DBs.
+pool.on("error", (error) => {
+  console.warn("Postgres pool idle client error:", error?.code || error?.message || error);
+});
+
+export { pool };

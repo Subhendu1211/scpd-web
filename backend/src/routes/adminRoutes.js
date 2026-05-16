@@ -109,6 +109,39 @@ router.post(
   adminAuthController.login,
 );
 
+router.post(
+  "/auth/login/request-otp",
+  loginRateLimiter,
+  [
+    body("identifier")
+      .isString()
+      .trim()
+      .notEmpty()
+      .withMessage("Email or mobile number is required"),
+    body("password").isLength({ min: 8 }).withMessage("Password is required"),
+    body("channel")
+      .optional({ values: "falsy" })
+      .isIn(["email", "sms"])
+      .withMessage("Channel must be email or sms"),
+  ],
+  adminAuthController.requestLoginOtp,
+);
+
+router.post(
+  "/auth/login/verify-otp",
+  loginRateLimiter,
+  [
+    body("challengeId")
+      .isInt({ min: 1 })
+      .withMessage("Valid challengeId is required")
+      .toInt(),
+    body("otp")
+      .isLength({ min: 4, max: 10 })
+      .withMessage("OTP must be between 4 and 10 characters"),
+  ],
+  adminAuthController.verifyLoginOtp,
+);
+
 /**
  * @swagger
  * /admin/auth/login:

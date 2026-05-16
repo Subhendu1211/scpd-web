@@ -7,6 +7,8 @@ interface AdminAuthState {
   loading: boolean;
   error: string | null;
   login(_credentials: { email: string; password: string }): Promise<boolean>;
+  establishSession(result: AdminLoginResponse): void;
+  setErrorMessage(message: string | null): void;
   logout(): void;
 }
 
@@ -57,6 +59,18 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
+  const establishSession = useCallback((result: AdminLoginResponse) => {
+    localStorage.setItem(TOKEN_KEY, result.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    setToken(result.token);
+    setUser(result.user);
+    setError(null);
+  }, []);
+
+  const setErrorMessage = useCallback((message: string | null) => {
+    setError(message);
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -65,8 +79,17 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   const value = useMemo(
-    () => ({ token, user, loading, error, login, logout }),
-    [token, user, loading, error, login, logout]
+    () => ({
+      token,
+      user,
+      loading,
+      error,
+      login,
+      establishSession,
+      setErrorMessage,
+      logout,
+    }),
+    [token, user, loading, error, login, establishSession, setErrorMessage, logout]
   );
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;
@@ -81,6 +104,8 @@ export function useAdminAuth() {
       loading: false,
       error: "Admin auth provider unavailable",
       login: async () => false,
+      establishSession: () => {},
+      setErrorMessage: () => {},
       logout: () => {},
     };
   }

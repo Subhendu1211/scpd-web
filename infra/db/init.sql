@@ -163,6 +163,21 @@ CREATE TABLE IF NOT EXISTS admin_password_resets (
 CREATE INDEX IF NOT EXISTS idx_admin_password_resets_user
   ON admin_password_resets(admin_user_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS admin_login_otps (
+  id SERIAL PRIMARY KEY,
+  admin_user_id INTEGER NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  otp_hash TEXT NOT NULL,
+  delivery_channel TEXT NOT NULL CHECK (delivery_channel IN ('email', 'sms')),
+  destination TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMP NOT NULL,
+  consumed_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_login_otps_user
+  ON admin_login_otps(admin_user_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS cms_media (
   id SERIAL PRIMARY KEY,
   file_name TEXT NOT NULL UNIQUE,

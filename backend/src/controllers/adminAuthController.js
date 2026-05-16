@@ -1,7 +1,9 @@
 import { validationResult } from "express-validator";
 import {
   authenticateAdminUser,
+  initiateAdminLoginOtp,
   initiatePasswordReset,
+  verifyAdminLoginOtp,
   resetPasswordWithOtp,
 } from "../services/adminAuthService.js";
 
@@ -32,6 +34,84 @@ export async function login(req, res) {
       return res.status(429).json({ error: error.message });
     }
     return res.status(500).json({ error: "Unable to authenticate" });
+  }
+}
+
+export async function requestLoginOtp(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { identifier, password, channel } = req.body;
+
+  try {
+    const result = await initiateAdminLoginOtp({
+      identifier,
+      password,
+      channel,
+      ipAddress: req.ip,
+    });
+
+    if (!result) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    return res.json({
+      success: true,
+      challengeId: result.challengeId,
+      channel: result.channel,
+      destination: maskDelivery(result.channel, result.destination),
+    });
+  } catch (error) {
+    console.error("requestLoginOtp error:", error?.message || error);
+    if (error.code === "ACCOUNT_DISABLED") {
+      return res
+        .status(403)
+        .json({
+          error:
+            "Your account has been disabled. Please contact an administrator.",
+        });
+    }
+    if (error.code === "ACCOUNT_LOCKED") {
+      return res.status(429).json({ error: error.message });
+    }
+    return res
+      .status(400)
+      .json({ error: error.message || "Unable to process request" });
+  }
+}
+
+export async function verifyLoginOtp(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { challengeId, otp } = req.body;
+  try {
+    const result = await verifyAdminLoginOtp({
+      challengeId,
+      otp,
+      ipAddress: req.ip,
+    });
+    if (!result.success) {
+      return res.status(400).json({ error: "Invalid or expired OTP" });
+    }
+
+    return res.json({ token: result.token, user: result.user });
+  } catch (error) {
+    if (error.code === "ACCOUNT_DISABLED") {
+      return res
+        .status(403)
+        .json({
+          error:
+            "Your account has been disabled. Please contact an administrator.",
+        });
+    }
+    return res
+      .status(400)
+      .json({ error: error.message || "Unable to verify OTP" });
   }
 }
 

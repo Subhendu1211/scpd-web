@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import {
   createBrowserRouter,
   RouterProvider,
-  Navigate,
 } from "react-router-dom";
 
 import AppShell from "./layout/AppShell";
@@ -19,7 +18,6 @@ import Sitemap from "./pages/Sitemap";
 import Feedback from "./pages/Feedback";
 import Help from "./pages/Help";
 import ErrorFallback from "./components/common/ErrorFallback";
-import NotFound from "./pages/NotFound";
 import CmsPage from "./pages/CmsPage";
 import AboutCommission from "./pages/CMS/aboutUs/AboutCommission"; //add like this
 import VisionMission from "@pages/CMS/aboutUs/VissionMission";
@@ -541,6 +539,6 @@ const router = createBrowserRouter([
 ]);
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <RouterProvider router={router} future={{ v7_startTransition: true }} />
   </React.StrictMode>,
 );

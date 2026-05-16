@@ -220,8 +220,23 @@ router.post(
     body("password")
       .isLength({ min: 8 })
       .withMessage("Password must be at least 8 characters"),
+    body("channel")
+      .optional({ values: "falsy" })
+      .isIn(["email", "sms"])
+      .withMessage("Channel must be email or sms"),
   ],
   userAuthController.login,
+);
+
+router.post(
+  "/auth/login/verify-otp",
+  [
+    body("challengeId").isString().notEmpty().withMessage("challengeId is required"),
+    body("otp")
+      .isLength({ min: 4, max: 10 })
+      .withMessage("OTP must be between 4 and 10 characters"),
+  ],
+  userAuthController.verifyLoginOtp,
 );
 
 // Public success stories (year-wise images)

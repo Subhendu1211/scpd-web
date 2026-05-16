@@ -35,6 +35,8 @@ Base: `/api/admin` (JWT bearer)
 
 Auth
 - POST /auth/login { email, password }
+- POST /auth/login/request-otp { identifier, password, channel?: email|sms }
+- POST /auth/login/verify-otp { challengeId, otp }
 - POST /auth/forgot-password { email?, phone?, channel?: email|sms }
 - POST /auth/reset-password { email, otp, password }
 
@@ -98,7 +100,18 @@ Base: `/api`
 - Store returned media fileName/path; serve via `/uploads/<fileName>`.
 - For tables, keep `limit` reasonable (<=500); define primary keys for row updates/deletes.
 - Colors expect hex like `#1b6dd1`; paths should start with `/`; slugs should be URL-friendly (a-z0-9-).
-- For SMS OTP in forgot-password (Twilio Verify), configure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID`.
+- For Odisha Govt SMS OTP, configure:
+- `GOVT_SMS_API_URL` (optional, defaults to `https://govtsms.odisha.gov.in/api/api.php`)
+- `GOVT_SMS_SOURCE`
+- `GOVT_SMS_DEPARTMENT_ID`
+- `GOVT_SMS_TEMPLATE_ID`
+- `GOVT_SMS_OTP_CONTENT` (template text with OTP token; supported: `{#var#}` or `#numeric#`/`#number#`)
+- `GOVT_SMS_STRIP_COUNTRY_CODE=true` is recommended when mobile numbers are stored as `91XXXXXXXXXX` but gateway expects local 10-digit recipient numbers.
+- If your provider rejects `sendOTPSMS`, set `GOVT_SMS_OTP_ACTION=singleSMS` and keep template/content aligned with the DLT-approved text.
+- For temporary troubleshooting, set `GOVT_SMS_OTP_SEND_BOTH_ACTIONS=true` to send OTP via both `sendOTPSMS` and `singleSMS` routes.
+- Twilio Verify can still be used as fallback with `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID`.
+- In local/dev, SMS OTP will now return an error if no provider is configured. Use `OTP_SMS_DEV_LOG_ONLY=true` only if you intentionally want log-only OTP preview mode.
+- For SMS gateway troubleshooting, set `OTP_SMS_GATEWAY_DEBUG_LOG=true` to also log successful provider responses; failures are always logged with full provider response body.
 
 ## Azure DB Setup (App Service)
 - No schema change is required; startup already runs `ensureBaseCmsSchema()` automatically.

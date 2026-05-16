@@ -16,7 +16,9 @@ import {
 } from "./models/ensureSchema.js";
 import { fetchMediaBinaryByFileName } from "./services/adminMediaService.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
 // Debug: print DB environment so we can verify which Postgres instance we're using
 try {
@@ -60,8 +62,6 @@ app.use("/api/admin", adminRouter);
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // serve built frontend if copied to /public
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "..", "public")));
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
@@ -111,6 +111,9 @@ app.use((err, _req, res, _next) => {
         .json({ error: "File too large." });
     }
     return res.status(400).json({ error: err.message || "Upload failed" });
+  }
+  if (err?.type === "entity.parse.failed" || err instanceof SyntaxError) {
+    return res.status(400).json({ error: "Invalid JSON payload." });
   }
   console.error(err);
   res.status(500).json({ error: "Internal server error" });

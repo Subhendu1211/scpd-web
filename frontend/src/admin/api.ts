@@ -19,6 +19,13 @@ export interface AdminLoginResponse {
   };
 }
 
+export interface AdminLoginOtpRequestResponse {
+  success: boolean;
+  challengeId: number;
+  channel: "email" | "sms";
+  destination?: string | null;
+}
+
 const adminApi = axios.create({
   baseURL: "/api/admin",
   withCredentials: false,
@@ -36,6 +43,25 @@ adminApi.interceptors.request.use((config) => {
 export function login(email: string, password: string) {
   return adminApi
     .post<AdminLoginResponse>("/auth/login", { email, password })
+    .then((res) => res.data);
+}
+
+export function requestAdminLoginOtp(payload: {
+  identifier: string;
+  password: string;
+  channel?: "email" | "sms";
+}) {
+  return adminApi
+    .post<AdminLoginOtpRequestResponse>("/auth/login/request-otp", payload)
+    .then((res) => res.data);
+}
+
+export function verifyAdminLoginOtp(payload: {
+  challengeId: number;
+  otp: string;
+}) {
+  return adminApi
+    .post<AdminLoginResponse>("/auth/login/verify-otp", payload)
     .then((res) => res.data);
 }
 

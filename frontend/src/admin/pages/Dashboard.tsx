@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CmsPage, fetchMenuTree, fetchPages, MenuItemPayload } from "../api";
+import { useAdminAuth } from "../auth";
+import { ADMIN_ONLY_ROLES } from "../rbac";
 import NewsTable from "../components/NewsTable";
 
 const STATUS_COPY: Record<
@@ -70,10 +72,14 @@ function formatDate(value?: string | null) {
 }
 
 const Dashboard: React.FC = () => {
+  const { user } = useAdminAuth();
   const [menu, setMenu] = useState<MenuItemPayload[]>([]);
   const [pages, setPages] = useState<CmsPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const role = user?.role;
+  const canManageUsers = !!role && ADMIN_ONLY_ROLES.includes(role);
+  const canViewLogs = canManageUsers;
 
   useEffect(() => {
     let cancelled = false;
@@ -469,6 +475,22 @@ const Dashboard: React.FC = () => {
                     Upload hero banners, inline visuals, and reusable assets.
                   </span>
                 </Link>
+                {canManageUsers ? (
+                  <Link to="/admin/users" className="dashboard-action-card">
+                    <strong>Manage users</strong>
+                    <span>
+                      Add admin accounts, assign roles, and keep access controlled.
+                    </span>
+                  </Link>
+                ) : null}
+                {canViewLogs ? (
+                  <Link to="/admin/logs" className="dashboard-action-card">
+                    <strong>Audit logs</strong>
+                    <span>
+                      Review admin activity history and workflow-level changes.
+                    </span>
+                  </Link>
+                ) : null}
               </div>
             </section>
           </div>

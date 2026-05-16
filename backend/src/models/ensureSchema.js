@@ -143,6 +143,7 @@ export async function ensureBaseCmsSchema() {
 
     await ensurePublishedCmsPages(client);
     await ensureAdminUserLockColumns();
+    await ensureAdminLoginOtpTable();
     await ensureCmsPagesPluralColumns();
   } finally {
     client.release();
@@ -167,6 +168,44 @@ export async function ensureAdminUserLockColumns() {
   } catch (error) {
     console.warn(
       "DB schema check: unable to ensure admin_users lock columns:",
+      error,
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function ensureAdminLoginOtpTable() {
+  const client = await pool.connect();
+  try {
+    const tableCheck = await client.query(
+      "SELECT to_regclass('public.admin_users') IS NOT NULL AS exists",
+    );
+    if (!tableCheck.rows?.[0]?.exists) {
+      return;
+    }
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_login_otps (
+        id SERIAL PRIMARY KEY,
+        admin_user_id INTEGER NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+        otp_hash TEXT NOT NULL,
+        delivery_channel TEXT NOT NULL CHECK (delivery_channel IN ('email', 'sms')),
+        destination TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TIMESTAMP NOT NULL,
+        consumed_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT now()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_admin_login_otps_user
+        ON admin_login_otps(admin_user_id, created_at DESC);
+    `);
+  } catch (error) {
+    console.warn(
+      "DB schema check: unable to ensure admin_login_otps table:",
       error,
     );
   } finally {

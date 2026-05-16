@@ -5,6 +5,8 @@ import { Box, Typography, IconButton, Button, Tabs, Tab } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import Lightbox from "yet-another-react-lightbox";
@@ -28,22 +30,26 @@ export default function GalleryHome() {
     news: "newspaper",
   };
 
-  const settings = {
+  const getSlidesToShow = (count: number) => {
+    if (typeof window === "undefined") {
+      return Math.max(1, Math.min(4, count || 1));
+    }
+    const width = window.innerWidth || 1280;
+    const base = width <= 640 ? 1 : width <= 960 ? 2 : width <= 1280 ? 3 : 4;
+    return Math.max(1, Math.min(base, count || 1));
+  };
+
+  const settings = (count: number) => ({
     dots: false,
     infinite: true,
     autoplay: true,
     autoplaySpeed: 3000,
     speed: 800,
-    slidesToShow: 4,
+    slidesToShow: getSlidesToShow(count),
     slidesToScroll: 1,
     arrows: false,
     pauseOnHover: true,
-    responsive: [
-      { breakpoint: 1200, settings: { slidesToShow: 3 } },
-      { breakpoint: 900, settings: { slidesToShow: 2 } },
-      { breakpoint: 600, settings: { slidesToShow: 1 } },
-    ],
-  };
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -74,13 +80,28 @@ export default function GalleryHome() {
     setLightboxOpen(true);
   };
 
+  const newsImageItems = newsItems.filter((item: CmsMediaItem) =>
+    String(item?.mimeType || "").startsWith("image/")
+  );
+
+  const isPdfLike = (item: CmsMediaItem) =>
+    String(item?.mimeType || "").toLowerCase() === "application/pdf" ||
+    /\.pdf($|\?)/i.test(String(item?.url || ""));
+
   const slides =
     tab === "photo"
       ? photoItems.map((item) => ({ src: item.url }))
-      : newsItems.map((item) => ({ src: item.url }));
+      : newsImageItems.map((item) => ({ src: item.url }));
 
   return (
-    <Box sx={{ width: "100%", padding: "40px 60px", backgroundColor: "#f5f7fb" }}>
+    <Box
+      sx={{
+        width: "100%",
+        px: { xs: 1.5, sm: 2.5, md: 5, lg: 7.5 },
+        py: { xs: 2.5, sm: 3.5, md: 5 },
+        backgroundColor: "#f5f7fb",
+      }}
+    >
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Box>
           <Typography
@@ -102,17 +123,25 @@ export default function GalleryHome() {
       <Tabs
         value={tab}
         onChange={(e, val) => setTab(val)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
         sx={{
           mt: 4,
           background: "#e6ebfb",
           borderRadius: "10px",
           padding: "4px",
+          "& .MuiTabs-flexContainer": {
+            flexWrap: "nowrap",
+          },
           "& .MuiTab-root": {
             fontWeight: 600,
             textTransform: "none",
-            fontSize: "17px",
-            px: 3,
+            fontSize: { xs: "15px", sm: "17px" },
+            px: { xs: 2, sm: 3 },
             borderRadius: "8px",
+            minHeight: { xs: 44, sm: 48 },
+            minWidth: "max-content",
           },
           "& .Mui-selected": {
             background: "#fff",
@@ -140,7 +169,7 @@ export default function GalleryHome() {
                   <Typography sx={{ color: "#4b5563" }}>{t("homepage.noPhotos")}</Typography>
                 ) : (
                   <>
-                    <Slider ref={sliderRef} {...settings}>
+                    <Slider ref={sliderRef} {...settings(photoItems.length || 1)}>
                       {(isLoading ? Array.from({ length: 4 }) : photoItems).map((item: any, i) => (
                         <Box key={i} sx={{ px: 1, cursor: "pointer" }} onClick={() => handleImageClick(i)}>
                           <Box
@@ -149,7 +178,7 @@ export default function GalleryHome() {
                             alt={isLoading ? "" : item?.altText || item?.originalName || "Photo"}
                             sx={{
                               width: "100%",
-                              height: "330px",
+                              height: { xs: "240px", sm: "300px", md: "330px" },
                               borderRadius: "10px",
                               objectFit: "cover",
                               backgroundColor: "#e5e7eb",
@@ -217,14 +246,14 @@ export default function GalleryHome() {
             ) : null}
             {!tabError && (videoItems.length > 0 || isLoading) ? (
               <>
-                <Slider ref={sliderRef} {...settings}>
+                <Slider ref={sliderRef} {...settings(videoItems.length || 1)}>
                   {(isLoading ? Array.from({ length: 4 }) : videoItems).map((item: any, i) => (
                     <Box key={i} sx={{ px: 1 }}>
                       {isLoading ? (
                         <Box
                           sx={{
                             width: "100%",
-                            height: "330px",
+                            height: { xs: "240px", sm: "300px", md: "330px" },
                             borderRadius: "10px",
                             backgroundColor: "#e5e7eb",
                           }}
@@ -239,7 +268,7 @@ export default function GalleryHome() {
                           playsInline
                           sx={{
                             width: "100%",
-                            height: "330px",
+                            height: { xs: "240px", sm: "300px", md: "330px" },
                             borderRadius: "10px",
                             objectFit: "cover",
                             backgroundColor: "#000",
@@ -308,21 +337,82 @@ export default function GalleryHome() {
             )}
             {!tabError && (isLoading ? Array.from({ length: 4 }) : newsItems).length > 0 && (
               <>
-                <Slider ref={sliderRef} {...settings}>
+                <Slider ref={sliderRef} {...settings(newsItems.length || 1)}>
                   {(isLoading ? Array.from({ length: 4 }) : newsItems).map((item: any, i) => (
-                    <Box key={i} sx={{ px: 1, cursor: "pointer" }} onClick={() => handleImageClick(i)}>
+                    <Box key={i} sx={{ px: 1 }}>
                       <Box
-                        component="img"
-                        src={isLoading ? undefined : item?.url}
-                        alt={isLoading ? "" : item?.altText || item?.originalName || "News clipping"}
                         sx={{
                           width: "100%",
-                          height: "330px",
+                          height: { xs: "240px", sm: "300px", md: "330px" },
                           borderRadius: "10px",
-                          objectFit: "cover",
                           backgroundColor: "#e5e7eb",
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
                         }}
-                      />
+                        onClick={() => {
+                          if (isLoading) return;
+                          if (isPdfLike(item)) {
+                            window.open(item?.url, "_blank", "noopener,noreferrer");
+                            return;
+                          }
+                          const imageIndex = newsImageItems.findIndex(
+                            (entry) => entry.id === item.id,
+                          );
+                          if (imageIndex >= 0) {
+                            handleImageClick(imageIndex);
+                          }
+                        }}
+                      >
+                        {isLoading ? null : isPdfLike(item) ? (
+                          <Box
+                            sx={{
+                              width: "100%",
+                              height: "100%",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 1,
+                              color: "#0f172a",
+                              background: "#f8fafc",
+                              px: 2,
+                              textAlign: "center",
+                            }}
+                          >
+                            <PictureAsPdfOutlinedIcon sx={{ fontSize: 56, color: "#dc2626" }} />
+                            <Typography sx={{ fontSize: "14px", fontWeight: 700 }}>
+                              {item?.originalName || item?.altText || "PDF clipping"}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                fontSize: "12px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                                color: "#1d4ed8",
+                                fontWeight: 700,
+                              }}
+                            >
+                              Open clipping <OpenInNewIcon sx={{ fontSize: 16 }} />
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Box
+                            component="img"
+                            src={item?.url}
+                            alt={item?.altText || item?.originalName || "News clipping"}
+                            sx={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              backgroundColor: "#e5e7eb",
+                            }}
+                          />
+                        )}
+                      </Box>
                     </Box>
                   ))}
                 </Slider>

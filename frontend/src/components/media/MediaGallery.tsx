@@ -118,7 +118,7 @@ function buildGallerySections(
   return albumSections;
 }
 
-function formatBytes(bytes: number | string | null): string {
+function _formatBytes(bytes: number | string | null): string {
   if (bytes === null || bytes === undefined) {
     return "";
   }
@@ -360,7 +360,7 @@ export default function MediaGallery({
                 <div
                   className={`gallery-grid${isPhotoGallery ? " is-photo" : ""}`}
                 >
-                  {section.items.map((item, index) => {
+                  {section.items.map((item) => {
                     const displayName =
                       item.altText || item.originalName || item.filename;
                     const mediaContent = renderMedia
@@ -369,6 +369,8 @@ export default function MediaGallery({
 
                     const isImage = item.mimeType.startsWith("image/");
                     const isVideo = item.mimeType.startsWith("video/");
+                    const isAudio = item.mimeType.startsWith("audio/");
+                    const isDocumentLike = !isImage && !isVideo && !isAudio;
 
                     // Keep cards uniform; no masonry variants
                     const extraClass = "";
@@ -377,7 +379,13 @@ export default function MediaGallery({
                       <figure
                         key={item.id}
                         className={`gallery-card${extraClass}`}
-                        onClick={() => openLightbox(item)}
+                        onClick={() => {
+                          if (category === "newspaper" || isDocumentLike) {
+                            window.open(item.url, "_blank", "noopener,noreferrer");
+                            return;
+                          }
+                          openLightbox(item);
+                        }}
                       >
                         <div
                           className={`gallery-thumb${isVideo ? " has-video" : ""}${isImage ? " is-photo" : ""}`}

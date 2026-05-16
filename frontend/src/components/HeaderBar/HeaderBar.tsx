@@ -12,6 +12,14 @@ import { IoLogoYoutube } from "react-icons/io";
 import { FaSearch } from "react-icons/fa";
 import SiteSearch from "../SiteSearch";
 import { api } from "../../services/api";
+
+type PublicLoginOtpChallenge = {
+  challengeId: string;
+  channel: "email" | "sms";
+  destination?: string;
+  message?: string;
+};
+
 export default function HeaderBar() {
   const { t } = useTranslation();
   const [lang, setLang] = useState<"en" | "or">(() => {
@@ -44,6 +52,8 @@ export default function HeaderBar() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
+  const [authOtpChallenge, setAuthOtpChallenge] = useState<PublicLoginOtpChallenge | null>(null);
+  const [authOtp, setAuthOtp] = useState("");
 
   const closeA11y = () => setShowA11y(false);
 
@@ -281,6 +291,10 @@ export default function HeaderBar() {
   };
 
   const handleAuthChange = (key: keyof typeof authForm, val: string) => {
+    if (authMode === "login" && (key === "email" || key === "password")) {
+      setAuthOtpChallenge(null);
+      setAuthOtp("");
+    }
     setAuthForm((prev) => ({ ...prev, [key]: val }));
   };
 
@@ -298,31 +312,54 @@ export default function HeaderBar() {
     setAuthError("");
     setAuthSuccess("");
 
-    const endpoint = `/auth/${authMode === "login" ? "login" : "signup"}`;
-    const payload =
-      authMode === "login"
-        ? {
-          email: authForm.email.trim(),
-          password: authForm.password,
+    try {
+      if (authMode === "login") {
+        if (authOtpChallenge) {
+          const { data } = await api.post("/auth/login/verify-otp", {
+            challengeId: authOtpChallenge.challengeId,
+            otp: authOtp.trim(),
+          });
+          if (data?.token) {
+            localStorage.setItem("auth_token", data.token);
+          }
+          setAuthSuccess("Login successful.");
+          setAuthOtpChallenge(null);
+          setAuthOtp("");
+          setTimeout(() => setOpenModal(false), 500);
+        } else {
+          const { data } = await api.post("/auth/login", {
+            email: authForm.email.trim(),
+            password: authForm.password,
+          });
+          if (data?.requiresOtp && data?.challengeId) {
+            setAuthOtpChallenge({
+              challengeId: data.challengeId,
+              channel: data.channel,
+              destination: data.destination,
+              message: data.message,
+            });
+            setAuthSuccess(data.message || "OTP sent. Please verify to continue.");
+          } else if (data?.token) {
+            localStorage.setItem("auth_token", data.token);
+            setAuthSuccess("Success! Redirecting...");
+            setTimeout(() => setOpenModal(false), 500);
+          } else {
+            setAuthError("Unexpected login response. Please try again.");
+          }
         }
-        : {
+      } else {
+        const { data } = await api.post("/auth/signup", {
           fullName: authForm.fullName.trim(),
           email: authForm.email.trim(),
           phone: authForm.phone.trim(),
           password: authForm.password,
-        };
-
-    try {
-      const { data } = await api.post(endpoint, payload);
-
-      if (data?.token) {
-        localStorage.setItem("auth_token", data.token);
+        });
+        if (data?.token) {
+          localStorage.setItem("auth_token", data.token);
+        }
+        setAuthSuccess("Account created successfully.");
+        setTimeout(() => setOpenModal(false), 500);
       }
-
-      setAuthSuccess("Success! Redirecting...");
-      setAuthError("");
-      // Optionally close modal after a short delay
-      setTimeout(() => setOpenModal(false), 500);
     } catch (err: any) {
       setAuthError(
         err?.response?.data?.error ||
@@ -676,7 +713,13 @@ export default function HeaderBar() {
                         {/* TOGGLE */}
                         <div className="flex mb-8 bg-white border border-gray-200 rounded-full p-1 w-full sm:w-fit shadow-sm">
                           <button
-                            onClick={() => setAuthMode("login")}
+                            onClick={() => {
+                              setAuthMode("login");
+                              setAuthOtpChallenge(null);
+                              setAuthOtp("");
+                              setAuthError("");
+                              setAuthSuccess("");
+                            }}
                             className={`px-4 sm:px-6 py-2 rounded-full text-sm font-semibold transition
                       ${authMode === "login"
                                 ? "bg-white shadow text-[#0b3a8c]"
@@ -686,7 +729,13 @@ export default function HeaderBar() {
                           </button>
 
                           <button
-                            onClick={() => setAuthMode("signup")}
+                            onClick={() => {
+                              setAuthMode("signup");
+                              setAuthOtpChallenge(null);
+                              setAuthOtp("");
+                              setAuthError("");
+                              setAuthSuccess("");
+                            }}
                             className={`px-4 sm:px-6 py-2 rounded-full text-sm font-semibold transition
                       ${authMode === "signup"
                                 ? "bg-white shadow text-[#0b3a8c]"
@@ -741,6 +790,23 @@ export default function HeaderBar() {
                             autoComplete={authMode === "login" ? "current-password" : "new-password"}
                             className="w-full border rounded-xl px-4 py-3 text-base md:text-lg focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder-gray-500"
                           />
+
+                          {authMode === "login" && authOtpChallenge && (
+                            <>
+                              <p className="text-sm text-gray-600">
+                                Enter OTP sent to your {authOtpChallenge.channel === "sms" ? "mobile" : "email"}{" "}
+                                {authOtpChallenge.destination ? `(${authOtpChallenge.destination})` : ""}.
+                              </p>
+                              <input
+                                type="text"
+                                placeholder="Enter OTP"
+                                value={authOtp}
+                                onChange={(e) => setAuthOtp(e.target.value)}
+                                autoComplete="one-time-code"
+                                className="w-full border rounded-xl px-4 py-3 text-base md:text-lg focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder-gray-500"
+                              />
+                            </>
+                          )}
                         </div>
 
                         {/* ACTION BUTTON */}
@@ -749,12 +815,14 @@ export default function HeaderBar() {
                             className="w-full bg-[#0b3a8c] text-white py-3 rounded-xl text-base md:text-lg font-semibold
                              hover:bg-[#0f4fb5] transition disabled:opacity-60"
                             onClick={handleAuthSubmit}
-                            disabled={authLoading}
+                            disabled={authLoading || (authMode === "login" && Boolean(authOtpChallenge) && !authOtp.trim())}
                           >
                             {authLoading
                               ? "Please wait..."
                               : authMode === "login"
-                                ? "Login"
+                                ? authOtpChallenge
+                                  ? "Verify OTP"
+                                  : "Send OTP"
                                 : "Create Account"}
                           </button>
                           {authError && (
