@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "migrate:azure-to-render": "node scripts/migrateAzureToRender.mjs"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

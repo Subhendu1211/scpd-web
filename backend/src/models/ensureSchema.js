@@ -2,9 +2,18 @@ import { pool } from "./db.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import bcrypt from "bcrypt";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const ADMIN_ROLES = new Set([
+  "author",
+  "department_reviewer",
+  "editor",
+  "publishing_officer",
+  "superadmin",
+  "admin",
+]);
 
 function resolveInitSqlPath() {
   const candidates = [
@@ -50,6 +59,92 @@ async function ensurePublishedCmsPages(client) {
 		 FROM cms_menu_items
 		 ON CONFLICT (menu_item_id) DO NOTHING`,
   );
+}
+
+function resolveDefaultAdminSeedConfig() {
+  const isProduction = process.env.NODE_ENV === "production";
+  const explicitEmail = String(process.env.DEFAULT_ADMIN_EMAIL || "")
+    .trim()
+    .toLowerCase();
+  const explicitPassword = String(process.env.DEFAULT_ADMIN_PASSWORD || "").trim();
+  const explicitRoleRaw = String(process.env.DEFAULT_ADMIN_ROLE || "superadmin")
+    .trim()
+    .toLowerCase();
+  const explicitRole = ADMIN_ROLES.has(explicitRoleRaw)
+    ? explicitRoleRaw
+    : "superadmin";
+
+  if (explicitEmail && explicitPassword) {
+    return {
+      email: explicitEmail,
+      password: explicitPassword,
+      role: explicitRole,
+      fullName: process.env.DEFAULT_ADMIN_FULL_NAME || "System Admin",
+    };
+  }
+
+  if (isProduction) {
+    return null;
+  }
+
+  return {
+    email: "admin@example.com",
+    password: "admin123",
+    role: "superadmin",
+    fullName: "Local Dev Admin",
+  };
+}
+
+export async function ensureDefaultAdminUser() {
+  const client = await pool.connect();
+  try {
+    const tableCheck = await client.query(
+      "SELECT to_regclass('public.admin_users') IS NOT NULL AS exists",
+    );
+    if (!tableCheck.rows?.[0]?.exists) {
+      return;
+    }
+
+    const countResult = await client.query(
+      "SELECT count(*)::int AS cnt FROM admin_users",
+    );
+    const totalUsers = Number(countResult.rows?.[0]?.cnt || 0);
+    if (totalUsers > 0) {
+      return;
+    }
+
+    const seedConfig = resolveDefaultAdminSeedConfig();
+    if (!seedConfig) {
+      console.warn(
+        "No admin users found. Set DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD to bootstrap an admin account.",
+      );
+      return;
+    }
+
+    if (seedConfig.password.length < 8) {
+      console.warn(
+        "Default admin password is too short. Set DEFAULT_ADMIN_PASSWORD with at least 8 characters.",
+      );
+      return;
+    }
+
+    const hash = await bcrypt.hash(seedConfig.password, 10);
+    const insert = await client.query(
+      `INSERT INTO admin_users (email, password_hash, role, full_name, is_active)
+       VALUES ($1, $2, $3, $4, TRUE)
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id, email`,
+      [seedConfig.email, hash, seedConfig.role, seedConfig.fullName || null],
+    );
+
+    if (insert.rows.length) {
+      console.info(`Bootstrapped default admin user: ${insert.rows[0].email}`);
+    }
+  } catch (error) {
+    console.warn("DB schema check: unable to ensure default admin user:", error);
+  } finally {
+    client.release();
+  }
 }
 
 export async function ensureCmsMediaCategoryConstraint() {
@@ -144,6 +239,7 @@ export async function ensureBaseCmsSchema() {
     await ensurePublishedCmsPages(client);
     await ensureAdminUserLockColumns();
     await ensureAdminLoginOtpTable();
+    await ensureDefaultAdminUser();
     await ensureCmsPagesPluralColumns();
   } finally {
     client.release();

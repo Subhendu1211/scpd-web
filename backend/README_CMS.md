@@ -105,7 +105,7 @@ Base: `/api`
 - `GOVT_SMS_SOURCE`
 - `GOVT_SMS_DEPARTMENT_ID`
 - `GOVT_SMS_TEMPLATE_ID`
-- `GOVT_SMS_OTP_CONTENT` (template text with OTP token; supported: `{#var#}` or `#numeric#`/`#number#`)
+- `GOVT_SMS_OTP_CONTENT` (template text with OTP token; supported: `{#var#}` or `#numeric#`/`#number#`; quote this value in `.env` because `#` starts a comment when unquoted)
 - `GOVT_SMS_STRIP_COUNTRY_CODE=true` is recommended when mobile numbers are stored as `91XXXXXXXXXX` but gateway expects local 10-digit recipient numbers.
 - If your provider rejects `sendOTPSMS`, set `GOVT_SMS_OTP_ACTION=singleSMS` and keep template/content aligned with the DLT-approved text.
 - For temporary troubleshooting, set `GOVT_SMS_OTP_SEND_BOTH_ACTIONS=true` to send OTP via both `sendOTPSMS` and `singleSMS` routes.

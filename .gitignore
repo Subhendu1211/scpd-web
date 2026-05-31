@@ -12,3 +12,4 @@ dist/
 # .env
 # .env.*
 # scpd-web/backend/.env
+backend/.env.migration.local

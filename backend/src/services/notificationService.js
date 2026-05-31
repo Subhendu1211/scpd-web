@@ -7,6 +7,8 @@ const DEFAULT_REGISTRATION_SMS_CONTENT =
   "SCPD, Govt. of Odisha: Your registration on the SCPD Portal has been completed successfully. You may now login using your registered credentials to access services. For assistance call 0674-2954518.";
 const DEFAULT_COMPLAINT_SMS_CONTENT =
   "SCPD, Govt. of Odisha: Your complaint has been successfully submitted on SCPD Portal. It will be reviewed and necessary action will be taken. For assistance call 0674-2954518.";
+const DEFAULT_OTP_SMS_CONTENT =
+  "SCPD, Govt. of Odisha: {#var#} is your OTP for login to SCPD Portal. Valid for 15 minutes only. Do not disclose it to anyone. For assistance call 0674-2954518.";
 const DEFAULT_REGISTRATION_TEMPLATE_ID = "1007658595469878380";
 const DEFAULT_COMPLAINT_TEMPLATE_ID = "1007977038878676392";
 
@@ -85,7 +87,7 @@ function normalizePhoneDigits(phone) {
   if (!phone) {
     return null;
   }
-  const digits = String(phone).replace(/\D+/g, "");
+  let digits = String(phone).replace(/\D+/g, "");
   if (digits.length < 10 || digits.length > 15) {
     return null;
   }
@@ -103,6 +105,24 @@ function normalizePhoneDigits(phone) {
   const countryCode = String(process.env.GOVT_SMS_COUNTRY_CODE || "91")
     .replace(/\D+/g, "")
     .trim();
+
+  // Normalize common user-entered patterns:
+  // 0091XXXXXXXXXX -> 91XXXXXXXXXX
+  // 0XXXXXXXXXX -> XXXXXXXXXX
+  // 091XXXXXXXXXX -> 91XXXXXXXXXX
+  if (digits.startsWith("00") && digits.length >= 12) {
+    digits = digits.slice(2);
+  }
+  if (digits.startsWith("0") && digits.length === 11) {
+    digits = digits.slice(1);
+  }
+  if (
+    countryCode &&
+    digits.length === countryCode.length + 11 &&
+    digits.startsWith(`0${countryCode}`)
+  ) {
+    digits = digits.slice(1);
+  }
 
   // For Indian DLT routes, 10-digit recipient numbers are often expected.
   // If a stored number has country code prefix (e.g. 91XXXXXXXXXX), strip it by default.
@@ -123,6 +143,12 @@ function normalizePhoneDigits(phone) {
     return `${countryCode}${digits}`;
   }
 
+  // When stripping country code for India routes, reject non-local lengths
+  // instead of forwarding malformed numbers that carriers may silently drop.
+  if (!forceCountryCode && stripCountryCode && countryCode === "91" && digits.length !== 10) {
+    return null;
+  }
+
   return digits;
 }
 
@@ -141,9 +167,30 @@ export function isGovtSmsConfigured() {
   );
 }
 
+function getGovtSmsOtpTemplate() {
+  const configured = cleanProviderValue(process.env.GOVT_SMS_OTP_CONTENT);
+  if (!configured) {
+    return DEFAULT_OTP_SMS_CONTENT;
+  }
+
+  const trimmed = String(configured).trim();
+  const hasOtpToken =
+    /\{#\s*var\s*#\}/i.test(trimmed) ||
+    /#\s*numeric\s*#/i.test(trimmed) ||
+    /#\s*number\s*#/i.test(trimmed);
+
+  if (!hasOtpToken && /:\s*\{\s*$/.test(trimmed)) {
+    console.warn(
+      "[GOVT_SMS] GOVT_SMS_OTP_CONTENT appears truncated at {#var#}. Quote the .env value; using the built-in SCPD OTP template for this send.",
+    );
+    return DEFAULT_OTP_SMS_CONTENT;
+  }
+
+  return configured;
+}
+
 function buildGovtSmsContent(code) {
-  const template =
-    process.env.GOVT_SMS_OTP_CONTENT || "Your OTP for SCPD login is {#var#}.";
+  const template = getGovtSmsOtpTemplate();
   const otp = String(code || "").trim();
   // Accept both legacy and tagged placeholder variants.
   // Examples: {#var#}, {# var #}, #numeric#, #number#
@@ -157,8 +204,30 @@ function buildGovtSmsContent(code) {
   return `${template} ${otp}`.trim();
 }
 
-async function sendGovtSmsMessage({ destination, content, templateId, action }) {
-  const source = cleanProviderValue(process.env.GOVT_SMS_SOURCE);
+function getGovtSmsSourceCandidates() {
+  const primary = cleanProviderValue(process.env.GOVT_SMS_SOURCE);
+  const fallbacks = String(process.env.GOVT_SMS_SOURCE_FALLBACKS || "")
+    .split(",")
+    .map((value) => cleanProviderValue(value))
+    .filter(Boolean);
+
+  return Array.from(new Set([primary, ...fallbacks].filter(Boolean)));
+}
+
+function isSenderDeptTemplateMismatchError(message) {
+  return /Sender\s*Id,\s*department\s*id\s*&\s*template\s*id\s*is\s*not\s*match/i.test(
+    String(message || ""),
+  );
+}
+
+async function sendGovtSmsMessage({
+  destination,
+  content,
+  templateId,
+  action,
+  sourceOverride,
+}) {
+  const source = cleanProviderValue(sourceOverride || process.env.GOVT_SMS_SOURCE);
   const departmentId = normalizeDepartmentId(process.env.GOVT_SMS_DEPARTMENT_ID);
   const resolvedTemplateId = cleanProviderValue(templateId || process.env.GOVT_SMS_TEMPLATE_ID);
   const endpoint =
@@ -281,6 +350,48 @@ async function sendGovtSmsMessage({ destination, content, templateId, action }) 
   });
 }
 
+async function sendGovtSmsMessageWithSourceFallback({
+  destination,
+  content,
+  templateId,
+  action,
+}) {
+  const candidates = getGovtSmsSourceCandidates();
+  if (!candidates.length) {
+    throw new Error(
+      "Govt SMS OTP is not configured. Set GOVT_SMS_SOURCE (and optional GOVT_SMS_SOURCE_FALLBACKS).",
+    );
+  }
+
+  let lastError = null;
+  for (let index = 0; index < candidates.length; index += 1) {
+    const sourceCandidate = candidates[index];
+    try {
+      await sendGovtSmsMessage({
+        destination,
+        content,
+        templateId,
+        action,
+        sourceOverride: sourceCandidate,
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      const canRetrySource =
+        index < candidates.length - 1 &&
+        isSenderDeptTemplateMismatchError(error?.message);
+      if (!canRetrySource) {
+        throw error;
+      }
+      console.warn(
+        `[GOVT_SMS] Source mapping rejected for source=${sourceCandidate}; retrying with next configured source.`,
+      );
+    }
+  }
+
+  throw lastError || new Error("Govt SMS provider rejected request.");
+}
+
 async function sendGovtSmsOtp({ destination, code }) {
   const configuredAction = cleanProviderValue(
     process.env.GOVT_SMS_OTP_ACTION || "sendOTPSMS",
@@ -291,7 +402,7 @@ async function sendGovtSmsOtp({ destination, code }) {
   const content = buildGovtSmsContent(code);
 
   try {
-    await sendGovtSmsMessage({
+    await sendGovtSmsMessageWithSourceFallback({
       destination,
       content,
       templateId,
@@ -301,7 +412,7 @@ async function sendGovtSmsOtp({ destination, code }) {
       const backupAction =
         configuredAction.toLowerCase() === "sendotpsms" ? "singleSMS" : "sendOTPSMS";
       try {
-        await sendGovtSmsMessage({
+        await sendGovtSmsMessageWithSourceFallback({
           destination,
           content,
           templateId,
@@ -324,7 +435,7 @@ async function sendGovtSmsOtp({ destination, code }) {
     console.warn(
       `[GOVT_SMS] OTP action ${configuredAction} failed, retrying with singleSMS. reason=${error?.message || error}`,
     );
-    await sendGovtSmsMessage({
+    await sendGovtSmsMessageWithSourceFallback({
       destination,
       content,
       templateId,
@@ -556,7 +667,7 @@ export async function sendPortalRegistrationNotification({ email, phone, fullNam
   const jobs = [];
   if (phone) {
     jobs.push(
-      sendGovtSmsMessage({
+      sendGovtSmsMessageWithSourceFallback({
         destination: phone,
         content: smsText,
         templateId: smsTemplateId,
@@ -586,7 +697,7 @@ export async function sendPortalComplaintNotification({ email, phone, fullName }
   const jobs = [];
   if (phone) {
     jobs.push(
-      sendGovtSmsMessage({
+      sendGovtSmsMessageWithSourceFallback({
         destination: phone,
         content: smsText,
         templateId: smsTemplateId,

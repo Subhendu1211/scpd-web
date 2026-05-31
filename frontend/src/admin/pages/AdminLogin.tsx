@@ -34,7 +34,7 @@ const AdminLogin: React.FC = () => {
     try {
       const result = await requestAdminLoginOtp({
         identifier: identifier.trim(),
-        password: password.trim(),
+        password,
         channel,
       });
       setChallenge(result);
@@ -119,7 +119,7 @@ const AdminLogin: React.FC = () => {
             <p>
               {challenge
                 ? `Enter the OTP sent to your ${challenge.channel === "sms" ? "mobile" : "email"} (${challenge.destination || "registered contact"}).`
-                : "Use your registered email/mobile and password to receive OTP."}
+                : "Use your registered admin email/mobile and password to receive OTP."}
             </p>
           </div>
 

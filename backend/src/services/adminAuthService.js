@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { pool } from "../models/db.js";
+import { ensureDefaultAdminUser } from "../models/ensureSchema.js";
 import { recordUserLog } from "./auditService.js";
 import {
   isGovtSmsConfigured,
@@ -272,6 +273,10 @@ export async function initiateAdminLoginOtp({
   channel,
   ipAddress,
 }) {
+  // In local/dev, admin bootstrap may still be running in background during
+  // the first login attempt. Ensure default admin seed has completed first.
+  await ensureDefaultAdminUser();
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
