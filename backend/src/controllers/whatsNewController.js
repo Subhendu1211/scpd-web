@@ -35,10 +35,11 @@ async function ensureTable(client) {
   }
 }
 
-export async function list(req, res) {
+export async function list(req, res, next) {
   const limit = Math.max(1, Math.min(Number(req.query.limit) || 50, 200));
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await ensureTable(client);
     // Debug: log request so we can trace 403/empty responses seen in browser
     try {
@@ -63,15 +64,18 @@ export async function list(req, res) {
       /* ignore logging errors */
     }
     res.json({ data: rows.map(mapRow) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function adminList(req, res) {
+export async function adminList(req, res, next) {
   const limit = Math.max(1, Math.min(Number(req.query.limit) || 200, 500));
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await ensureTable(client);
     const { rows } = await client.query(
       `SELECT id, title, description, link, published_at, created_at
@@ -81,18 +85,21 @@ export async function adminList(req, res) {
       [limit]
     );
     res.json({ data: rows.map(mapRow) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function create(req, res) {
+export async function create(req, res, next) {
   const { title, description, link, publishedAt } = req.body;
   const role = (req.user?.role || "").toLowerCase();
   const effectivePublishedAt = role === "author" ? null : (publishedAt || new Date());
 
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await ensureTable(client);
     const { rows } = await client.query(
       `INSERT INTO whats_new (title, description, link, published_at)
@@ -101,15 +108,18 @@ export async function create(req, res) {
       [title, description || null, link || null, effectivePublishedAt]
     );
     res.status(201).json({ data: mapRow(rows[0]) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function remove(req, res) {
+export async function remove(req, res, next) {
   const { id } = req.params;
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     const { rows } = await client.query(
       `DELETE FROM whats_new WHERE id = $1
        RETURNING id, title, description, link, published_at, created_at`,
@@ -119,7 +129,9 @@ export async function remove(req, res) {
       return res.status(404).json({ error: "Not found" });
     }
     res.json({ data: mapRow(rows[0]) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }

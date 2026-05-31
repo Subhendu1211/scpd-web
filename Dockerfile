@@ -18,6 +18,7 @@ RUN npm ci --omit=dev
 
 COPY backend/src ./src
 COPY backend/public ./public
+COPY infra/db ./infra/db
 COPY --from=frontend-build /app/frontend/dist ./public
 
 RUN mkdir -p uploads

@@ -25,7 +25,7 @@ async function ensureFeedbackTable(client) {
   `);
 }
 
-export async function submit(req, res) {
+export async function submit(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -36,8 +36,9 @@ export async function submit(req, res) {
   const subject = String(req.body.subject || "").trim() || null;
   const message = String(req.body.message || "").trim();
 
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await ensureFeedbackTable(client);
     const { rows } = await client.query(
       `INSERT INTO feedback_submissions (name, email, subject, message)
@@ -50,16 +51,19 @@ export async function submit(req, res) {
       message: "Feedback submitted successfully.",
       data: mapRow(rows[0]),
     });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function adminList(req, res) {
+export async function adminList(req, res, next) {
   const limit = Math.max(1, Math.min(Number(req.query.limit) || 200, 500));
 
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await ensureFeedbackTable(client);
     const { rows } = await client.query(
       `SELECT id, name, email, subject, message, created_at
@@ -70,7 +74,9 @@ export async function adminList(req, res) {
     );
 
     return res.json({ data: rows.map(mapRow) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }

@@ -91,10 +91,11 @@ async function ensureNewsTable(client) {
   );
 }
 
-export async function list(req, res) {
+export async function list(req, res, next) {
   const limit = Math.max(1, Math.min(Number(req.query.limit) || 50, 200));
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await ensureNewsTable(client);
     const { rows } = await client.query(
       `SELECT id, title, body, image_url, published_at
@@ -105,15 +106,18 @@ export async function list(req, res) {
       [limit],
     );
     res.json({ data: rows.map(mapRow) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function adminList(req, res) {
+export async function adminList(req, res, next) {
   const limit = Math.max(1, Math.min(Number(req.query.limit) || 200, 500));
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await ensureNewsTable(client);
     const { rows } = await client.query(
       `SELECT id, title, body, image_url, published_at
@@ -123,12 +127,14 @@ export async function adminList(req, res) {
       [limit],
     );
     res.json({ data: rows.map(mapRow) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function create(req, res) {
+export async function create(req, res, next) {
   const { title, body, publishedAt } = req.body;
   const role = (req.user?.role || "").toLowerCase();
   const effectivePublishedAt =
@@ -138,9 +144,10 @@ export async function create(req, res) {
       ? req.body.imageUrl.trim()
       : null;
 
-  const client = await pool.connect();
+  let client;
   let uploadedImageUrl = null;
   try {
+    client = await pool.connect();
     await ensureNewsTable(client);
     uploadedImageUrl = await persistUploadedNewsImage(req.file);
     const imageUrl = uploadedImageUrl || manualImageUrl;
@@ -156,16 +163,17 @@ export async function create(req, res) {
     if (uploadedImageUrl) {
       await removeNewsImageFile(uploadedImageUrl);
     }
-    throw error;
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function remove(req, res) {
+export async function remove(req, res, next) {
   const { id } = req.params;
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     const { rows } = await client.query(
       `DELETE FROM news
        WHERE id = $1
@@ -177,20 +185,23 @@ export async function remove(req, res) {
     }
     await removeNewsImageFile(rows[0].image_url);
     res.json({ data: mapRow(rows[0]) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
-export async function update(req, res) {
+export async function update(req, res, next) {
   const { id } = req.params;
   const { title, body, publishedAt } = req.body;
   const removeImage = parseRemoveImageFlag(req.body.removeImage);
   const explicitImageUrl =
     typeof req.body.imageUrl === "string" ? req.body.imageUrl.trim() : undefined;
 
-  const client = await pool.connect();
+  let client;
   let newUploadedImageUrl = null;
   try {
+    client = await pool.connect();
     await ensureNewsTable(client);
     const existingResult = await client.query(
       `SELECT id, title, body, image_url, published_at
@@ -244,16 +255,17 @@ export async function update(req, res) {
     if (newUploadedImageUrl) {
       await removeNewsImageFile(newUploadedImageUrl);
     }
-    throw error;
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
-export async function getById(req, res) {
+export async function getById(req, res, next) {
   const { id } = req.params;
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     const { rows } = await client.query(
       `SELECT id, title, body, image_url, published_at 
          FROM news 
@@ -264,7 +276,9 @@ export async function getById(req, res) {
       return res.status(404).json({ error: "Not found" });
     }
     res.json({ data: mapRow(rows[0]) });
+  } catch (error) {
+    next(error);
   } finally {
-    client.release();
+    client?.release();
   }
 }
