@@ -14,7 +14,7 @@ import {
   ensureCmsMediaCategoryConstraint,
   ensureCmsMediaFileBytesColumn,
 } from "./models/ensureSchema.js";
-import { checkDbHealth } from "./models/db.js";
+import { checkDbHealth, getDbRuntimeInfo } from "./models/db.js";
 import { fetchMediaBinaryByFileName } from "./services/adminMediaService.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -71,6 +71,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/api/health", async (_req, res) => {
+  const runtime = getDbRuntimeInfo();
   try {
     const db = await checkDbHealth();
     return res.json({
@@ -79,6 +80,7 @@ app.get("/api/health", async (_req, res) => {
         connected: true,
         database: db?.database || null,
         user: db?.username || null,
+        runtime,
       },
     });
   } catch (error) {
@@ -87,6 +89,8 @@ app.get("/api/health", async (_req, res) => {
       ok: false,
       db: {
         connected: false,
+        runtime,
+        errorCode: error?.code || null,
       },
     });
   }

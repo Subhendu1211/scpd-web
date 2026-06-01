@@ -195,11 +195,29 @@ function parseKeyValueConnectionString(connectionString) {
   };
 }
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  process.env.POSTGRES_CONNECTION_STRING ||
-  readAzurePostgresConnectionString();
+function resolveConnectionString() {
+  if (process.env.DATABASE_URL) {
+    return { value: process.env.DATABASE_URL, source: "DATABASE_URL" };
+  }
+  if (process.env.POSTGRES_URL) {
+    return { value: process.env.POSTGRES_URL, source: "POSTGRES_URL" };
+  }
+  if (process.env.POSTGRES_CONNECTION_STRING) {
+    return {
+      value: process.env.POSTGRES_CONNECTION_STRING,
+      source: "POSTGRES_CONNECTION_STRING",
+    };
+  }
+  const azureConnString = readAzurePostgresConnectionString();
+  if (azureConnString) {
+    return { value: azureConnString, source: "POSTGRESQLCONNSTR_*" };
+  }
+  return { value: "", source: null };
+}
+
+const connectionInfo = resolveConnectionString();
+const connectionString = connectionInfo.value || "";
+const connectionStringSource = connectionInfo.source;
 
 const parsedKeyValueConfig = parseKeyValueConnectionString(connectionString);
 
@@ -241,6 +259,7 @@ console.debug("Postgres connection details:", {
   host: connectionHost,
   database: resolvedDatabase,
   usingConnectionString: Boolean(connectionString),
+  connectionStringSource,
   ssl: Boolean(fallbackSsl),
 });
 
@@ -271,6 +290,21 @@ export async function checkDbHealth() {
     "SELECT current_database() AS database, current_user AS username",
   );
   return result.rows[0] || null;
+}
+
+export function getDbRuntimeInfo() {
+  return {
+    nodeEnv: process.env.NODE_ENV || null,
+    dotenvLoaded: Boolean(shouldLoadLocalEnv && dotenvResult?.parsed),
+    usingConnectionString: Boolean(connectionString),
+    connectionStringSource,
+    hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+    hasPostgresUrl: Boolean(process.env.POSTGRES_URL),
+    hasPostgresConnectionString: Boolean(process.env.POSTGRES_CONNECTION_STRING),
+    hasDbHostOrPgHost: Boolean(process.env.DB_HOST || process.env.PGHOST),
+    host: connectionHost,
+    database: resolvedDatabase,
+  };
 }
 
 export { pool };
