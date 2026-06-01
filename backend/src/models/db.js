@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env") });
 const { Pool } = pg;
 
 function isTruthy(value) {
@@ -13,6 +12,31 @@ function isTruthy(value) {
     .trim()
     .toLowerCase();
   return ["1", "true", "yes", "on"].includes(normalized);
+}
+
+function shouldLoadDotenv() {
+  if (process.env.NODE_ENV !== "production") {
+    return true;
+  }
+  return isTruthy(process.env.LOAD_DOTENV_IN_PRODUCTION);
+}
+
+const dotEnvPath = path.resolve(__dirname, "..", "..", ".env");
+const shouldLoadLocalEnv = shouldLoadDotenv();
+const dotenvResult = shouldLoadLocalEnv
+  ? dotenv.config({ path: dotEnvPath })
+  : { parsed: null };
+
+if (!shouldLoadLocalEnv && process.env.NODE_ENV === "production") {
+  console.info(
+    "Skipping .env file load in production. Set LOAD_DOTENV_IN_PRODUCTION=true to override.",
+  );
+}
+
+if (process.env.NODE_ENV === "production" && dotenvResult?.parsed) {
+  console.warn(
+    "Loaded .env in production. Prefer platform environment variables to avoid stale DB credentials.",
+  );
 }
 
 function isLocalHost(host) {
@@ -58,6 +82,19 @@ function extractHostFromConnectionString(connectionString) {
     return String(parsed.hostname || "")
       .trim()
       .toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function extractDatabaseFromConnectionString(connectionString) {
+  if (!connectionString || !connectionString.includes("://")) return "";
+  try {
+    const parsed = new URL(connectionString);
+    const dbName = String(parsed.pathname || "")
+      .replace(/^\/+/, "")
+      .trim();
+    return decodeURIComponent(dbName);
   } catch {
     return "";
   }
@@ -168,11 +205,38 @@ const parsedKeyValueConfig = parseKeyValueConnectionString(connectionString);
 
 const fallbackHost = process.env.DB_HOST || process.env.PGHOST || "localhost";
 const connectionHost = extractHostFromConnectionString(connectionString) || fallbackHost;
+const connectionDatabaseFromUrl = extractDatabaseFromConnectionString(connectionString);
 const fallbackSsl =
   resolveSslConfig({ host: connectionHost, connectionString }) || undefined;
 
 const resolvedDatabase =
-  parsedKeyValueConfig?.database || process.env.DB_NAME || process.env.PGDATABASE || "scpd";
+  parsedKeyValueConfig?.database ||
+  connectionDatabaseFromUrl ||
+  process.env.DB_NAME ||
+  process.env.PGDATABASE ||
+  "scpd";
+
+if (
+  connectionString &&
+  fallbackHost &&
+  extractHostFromConnectionString(connectionString) &&
+  fallbackHost.toLowerCase() !== extractHostFromConnectionString(connectionString)
+) {
+  console.warn(
+    "Both DATABASE_URL and DB_HOST/PGHOST are set with different hosts. DATABASE_URL takes precedence.",
+  );
+}
+
+if (
+  process.env.NODE_ENV === "production" &&
+  !connectionString &&
+  (fallbackHost === "localhost" || resolvedDatabase === "scpd")
+) {
+  console.warn(
+    "Production is using fallback DB defaults (localhost/scpd). Set DATABASE_URL or DB_* variables explicitly.",
+  );
+}
+
 console.debug("Postgres connection details:", {
   host: connectionHost,
   database: resolvedDatabase,
@@ -201,5 +265,12 @@ const pool =
 pool.on("error", (error) => {
   console.warn("Postgres pool idle client error:", error?.code || error?.message || error);
 });
+
+export async function checkDbHealth() {
+  const result = await pool.query(
+    "SELECT current_database() AS database, current_user AS username",
+  );
+  return result.rows[0] || null;
+}
 
 export { pool };

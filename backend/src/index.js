@@ -14,11 +14,25 @@ import {
   ensureCmsMediaCategoryConstraint,
   ensureCmsMediaFileBytesColumn,
 } from "./models/ensureSchema.js";
+import { checkDbHealth } from "./models/db.js";
 import { fetchMediaBinaryByFileName } from "./services/adminMediaService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+
+function isTruthy(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
+}
+
+const shouldLoadDotenv =
+  process.env.NODE_ENV !== "production" ||
+  isTruthy(process.env.LOAD_DOTENV_IN_PRODUCTION);
+if (shouldLoadDotenv) {
+  dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+}
 
 // Debug: print DB environment so we can verify which Postgres instance we're using
 try {
@@ -56,7 +70,27 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/health", async (_req, res) => {
+  try {
+    const db = await checkDbHealth();
+    return res.json({
+      ok: true,
+      db: {
+        connected: true,
+        database: db?.database || null,
+        user: db?.username || null,
+      },
+    });
+  } catch (error) {
+    console.error("Health check DB error:", error?.message || error);
+    return res.status(503).json({
+      ok: false,
+      db: {
+        connected: false,
+      },
+    });
+  }
+});
 app.use("/api", apiRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
