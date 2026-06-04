@@ -12,6 +12,7 @@ import {
   ensureBaseCmsSchema,
   ensureCmsMediaCaptionTextColorColumn,
   ensureCmsMediaCategoryConstraint,
+  ensureCmsMediaFileChunksTable,
   ensureCmsMediaFileBytesColumn,
 } from "./models/ensureSchema.js";
 import { checkDbHealth, getDbRuntimeInfo } from "./models/db.js";
@@ -171,6 +172,7 @@ app.listen(PORT, () => {
     await ensureBaseCmsSchema();
     await ensureCmsMediaCategoryConstraint();
     await ensureCmsMediaFileBytesColumn();
+    await ensureCmsMediaFileChunksTable();
     await ensureCmsMediaCaptionTextColorColumn();
   } catch (error) {
     console.error("Startup bootstrap warning (server still running):", error);

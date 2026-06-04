@@ -206,7 +206,7 @@ export async function fetchMediaBinaryByFileName(fileName) {
   const client = await pool.connect();
   try {
     const { rows } = await client.query(
-      `SELECT mime_type, file_bytes
+      `SELECT id, mime_type, file_bytes
 				 FROM cms_media
 				WHERE file_name = $1
 				LIMIT 1`,
@@ -215,10 +215,33 @@ export async function fetchMediaBinaryByFileName(fileName) {
 
     if (!rows.length) return null;
     const row = rows[0];
-    if (!row.file_bytes) return null;
+    if (row.file_bytes) {
+      return {
+        mimeType: row.mime_type,
+        fileBytes: row.file_bytes,
+      };
+    }
+
+    let chunkRows = [];
+    try {
+      const chunkResult = await client.query(
+        `SELECT chunk_bytes
+           FROM cms_media_file_chunks
+          WHERE media_id = $1
+          ORDER BY chunk_index`,
+        [row.id],
+      );
+      chunkRows = chunkResult.rows;
+    } catch (error) {
+      if (error?.code !== "42P01") {
+        throw error;
+      }
+    }
+
+    if (!chunkRows.length) return null;
     return {
       mimeType: row.mime_type,
-      fileBytes: row.file_bytes,
+      fileBytes: Buffer.concat(chunkRows.map((chunk) => chunk.chunk_bytes)),
     };
   } finally {
     client.release();

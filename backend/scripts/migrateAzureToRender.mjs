@@ -44,6 +44,25 @@ function sqlString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+function isTransientConnectionError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  const code = String(error?.code || "").toUpperCase();
+  if (["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EPIPE", "57P01"].includes(code)) {
+    return true;
+  }
+  return (
+    message.includes("connection terminated unexpectedly") ||
+    message.includes("server closed the connection unexpectedly") ||
+    message.includes("connection reset") ||
+    message.includes("connection ended unexpectedly") ||
+    message.includes("timeout")
+  );
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function isPlaceholder(value) {
   return /REPLACE_WITH|CHANGE_ME|<[^>]+>/.test(String(value || ""));
 }
@@ -63,6 +82,7 @@ function extractUrlInfo(connectionString) {
 }
 
 function buildConfig(name, primaryPrefix, fallbackPrefix) {
+  const connectionTimeoutMillis = toNumber(process.env.MIGRATION_CONNECTION_TIMEOUT_MS, 15000);
   const url =
     process.env[`${primaryPrefix}_DATABASE_URL`] ||
     process.env[`${primaryPrefix}_URL`] ||
@@ -75,6 +95,7 @@ function buildConfig(name, primaryPrefix, fallbackPrefix) {
       client: {
         connectionString: url,
         ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis,
       },
       info: {
         ...info,
@@ -109,6 +130,7 @@ function buildConfig(name, primaryPrefix, fallbackPrefix) {
       user,
       password,
       database,
+      connectionTimeoutMillis,
       ...(ssl ? { ssl: { rejectUnauthorized: false } } : {}),
     },
     info: {
@@ -392,7 +414,7 @@ async function getConstraints(client, table, types) {
         END,
         conname;
     `,
-    [`public.${table}`, types],
+    [table, types],
   );
 }
 
@@ -630,52 +652,69 @@ async function getRowCount(client, table) {
 }
 
 async function copyTableRows(sourceClient, targetClient, table) {
+  const deferByteaColumns = toBool(process.env.MIGRATION_DEFER_BYTEA_COLUMNS, false);
   const sourceColumns = (await getTableColumns(sourceClient, table)).filter(
     (column) => !column.generated_kind,
   );
   const targetByName = new Map(
     (await getTableColumns(targetClient, table)).map((column) => [column.column_name, column]),
   );
-  const columns = sourceColumns
+  const matchingColumns = sourceColumns
     .map((sourceColumn) => ({
       ...sourceColumn,
       target_udt: targetByName.get(sourceColumn.column_name)?.udt_name || sourceColumn.udt_name,
     }))
     .filter((column) => targetByName.has(column.column_name));
+  const columns = matchingColumns.filter(
+    (column) =>
+      !deferByteaColumns || (column.udt_name !== "bytea" && column.target_udt !== "bytea"),
+  );
+  const deferredColumns = matchingColumns.length - columns.length;
+
+  if (deferredColumns) {
+    console.log(`Deferred ${deferredColumns} bytea column(s) -> ${table}`);
+  }
 
   if (!columns.length) return 0;
 
   const columnNames = columns.map((column) => column.column_name);
   const colList = columnNames.map(q).join(", ");
-  const sourceRows = await queryRows(sourceClient, `SELECT ${colList} FROM ${tableRef(table)};`);
-  if (!sourceRows.length) return 0;
-
   const hasAlwaysIdentity = columns.some((column) => column.identity_kind === "a");
   const override = hasAlwaysIdentity ? " OVERRIDING SYSTEM VALUE" : "";
   const hasBinaryColumn = columns.some(
     (column) => column.udt_name === "bytea" || column.target_udt === "bytea",
   );
-  const batchSize = hasBinaryColumn ? 1 : 200;
+  const fetchBatchSize = hasBinaryColumn ? 8 : 1000;
+  const insertBatchSize = hasBinaryColumn ? 1 : 200;
   let copied = 0;
 
-  for (let offset = 0; offset < sourceRows.length; offset += batchSize) {
-    const batch = sourceRows.slice(offset, offset + batchSize);
-    const values = [];
-    const placeholders = batch.map((row, rowIndex) => {
-      const base = rowIndex * columnNames.length;
-      const rowPlaceholders = columnNames.map((columnName, columnIndex) => {
-        const column = columns[columnIndex];
-        values.push(transformValueForTarget(row[columnName], column.udt_name, column.target_udt));
-        return `$${base + columnIndex + 1}`;
-      });
-      return `(${rowPlaceholders.join(", ")})`;
-    });
-
-    await targetClient.query(
-      `INSERT INTO ${tableRef(table)} (${colList})${override} VALUES ${placeholders.join(", ")};`,
-      values,
+  for (let offset = 0; ; offset += fetchBatchSize) {
+    const sourceRows = await queryRows(
+      sourceClient,
+      `SELECT ${colList} FROM ${tableRef(table)} LIMIT $1 OFFSET $2;`,
+      [fetchBatchSize, offset],
     );
-    copied += batch.length;
+    if (!sourceRows.length) break;
+
+    for (let start = 0; start < sourceRows.length; start += insertBatchSize) {
+      const batch = sourceRows.slice(start, start + insertBatchSize);
+      const values = [];
+      const placeholders = batch.map((row, rowIndex) => {
+        const base = rowIndex * columnNames.length;
+        const rowPlaceholders = columnNames.map((columnName, columnIndex) => {
+          const column = columns[columnIndex];
+          values.push(transformValueForTarget(row[columnName], column.udt_name, column.target_udt));
+          return `$${base + columnIndex + 1}`;
+        });
+        return `(${rowPlaceholders.join(", ")})`;
+      });
+
+      await targetClient.query(
+        `INSERT INTO ${tableRef(table)} (${colList})${override} VALUES ${placeholders.join(", ")};`,
+        values,
+      );
+      copied += batch.length;
+    }
   }
 
   return copied;
@@ -745,6 +784,11 @@ async function main() {
 
   const validateOnly = toBool(process.env.MIGRATION_VALIDATE_ONLY, true);
   const confirm = String(process.env.MIGRATION_CONFIRM || "");
+  const maxTableRetries = toNumber(process.env.MIGRATION_TABLE_RETRIES, 4);
+  const requestedTables = String(process.env.MIGRATION_TABLES || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   console.log("Azure source:", safeInfo(sourceConfig));
   console.log("Render target:", safeInfo(targetConfig));
@@ -760,12 +804,29 @@ async function main() {
   let droppedTargetForeignKeys = [];
 
   async function reconnect(reason) {
-    await Promise.allSettled([sourceClient.end(), targetClient.end()]);
-    sourceClient = createClient("Azure source", sourceConfig);
-    targetClient = createClient("Render target", targetConfig);
-    await sourceClient.connect();
-    await targetClient.connect();
-    console.log(`Reconnected databases for ${reason}.`);
+    const maxReconnectRetries = toNumber(process.env.MIGRATION_RECONNECT_RETRIES, 3);
+
+    for (let attempt = 1; ; attempt += 1) {
+      await Promise.allSettled([sourceClient.end(), targetClient.end()]);
+      sourceClient = createClient("Azure source", sourceConfig);
+      targetClient = createClient("Render target", targetConfig);
+
+      try {
+        await sourceClient.connect();
+        await targetClient.connect();
+        console.log(`Reconnected databases for ${reason}.`);
+        return;
+      } catch (error) {
+        await Promise.allSettled([sourceClient.end(), targetClient.end()]);
+        if (!isTransientConnectionError(error) || attempt >= maxReconnectRetries) {
+          throw error;
+        }
+        console.warn(
+          `Reconnect failed for ${reason} (attempt ${attempt}/${maxReconnectRetries}). Retrying...`,
+        );
+        await sleep(1000 * attempt);
+      }
+    }
   }
 
   try {
@@ -780,13 +841,32 @@ async function main() {
       throw new Error("Azure source has no public tables to migrate.");
     }
 
+    const tablesToMigrate = requestedTables.length
+      ? sourceTables.filter((table) => requestedTables.includes(table))
+      : sourceTables;
+    const missingRequestedTables = requestedTables.filter(
+      (table) => !sourceTables.includes(table),
+    );
+    if (missingRequestedTables.length) {
+      throw new Error(
+        `Requested MIGRATION_TABLES not found in Azure source: ${missingRequestedTables.join(", ")}`,
+      );
+    }
+    if (!tablesToMigrate.length) {
+      throw new Error("No source tables selected for migration.");
+    }
+
+    if (requestedTables.length) {
+      console.log(`Scoped migration tables: ${tablesToMigrate.join(", ")}`);
+    }
+
     const sourceCounts = [];
-    for (const table of sourceTables) {
+    for (const table of tablesToMigrate) {
       sourceCounts.push({ table, rows: await getRowCount(sourceClient, table) });
     }
 
     const targetTablesBefore = await getPublicTables(targetClient);
-    const missingOnTarget = sourceTables.filter((table) => !targetTablesBefore.includes(table));
+    const missingOnTarget = tablesToMigrate.filter((table) => !targetTablesBefore.includes(table));
 
     console.log(`Render public tables before migration: ${targetTablesBefore.length}`);
     console.log(`Tables to create on Render: ${missingOnTarget.length}`);
@@ -803,36 +883,51 @@ async function main() {
     await bootstrapTargetSchemaIfEmpty(targetClient);
     await syncEnumTypes(sourceClient, targetClient);
 
-    for (const table of sourceTables) {
+    for (const table of tablesToMigrate) {
       await ensureTableShape(sourceClient, targetClient, table);
       await syncConstraints(sourceClient, targetClient, table, ["p", "u", "c"]);
     }
 
-    droppedTargetForeignKeys = await dropForeignKeys(targetClient, sourceTables);
+    droppedTargetForeignKeys = await dropForeignKeys(targetClient, tablesToMigrate);
 
-    const truncateSql = `TRUNCATE TABLE ${sourceTables.map(tableRef).join(
+    const truncateSql = `TRUNCATE TABLE ${tablesToMigrate.map(tableRef).join(
       ", ",
     )} RESTART IDENTITY CASCADE;`;
     await targetClient.query(truncateSql);
-    console.log(`Truncated ${sourceTables.length} Render tables.`);
+    console.log(`Truncated ${tablesToMigrate.length} Render tables.`);
 
     await reconnect("bulk copy");
 
     const fkEdges = [
-      ...(await getForeignKeyEdges(sourceClient, sourceTables)),
+      ...(await getForeignKeyEdges(sourceClient, tablesToMigrate)),
     ];
-    const orderedTables = topoSortTables(sourceTables, fkEdges);
+    const orderedTables = topoSortTables(tablesToMigrate, fkEdges);
     const stats = [];
 
     for (let idx = 0; idx < orderedTables.length; idx += 1) {
       const table = orderedTables[idx];
-      try {
-        const copied = await copyTableRows(sourceClient, targetClient, table);
-        await resetSequences(targetClient, table);
-        stats.push({ table, copied });
-        console.log(`Copied ${copied} rows -> ${table}`);
-      } catch (error) {
-        throw new Error(`Copy failed for ${table}: ${error.message}`);
+      let attempts = 0;
+      // Retry a table copy when cloud databases drop long-lived connections.
+      while (true) {
+        try {
+          const copied = await copyTableRows(sourceClient, targetClient, table);
+          await resetSequences(targetClient, table);
+          stats.push({ table, copied });
+          console.log(`Copied ${copied} rows -> ${table}`);
+          break;
+        } catch (error) {
+          attempts += 1;
+          const retryable = isTransientConnectionError(error) && attempts <= maxTableRetries;
+          if (!retryable) {
+            throw new Error(`Copy failed for ${table}: ${error.message}`);
+          }
+
+          console.warn(
+            `Transient copy failure on ${table} (attempt ${attempts}/${maxTableRetries}). Reconnecting and retrying...`,
+          );
+          await reconnect(`retry ${table}`);
+          await targetClient.query(`TRUNCATE TABLE ${tableRef(table)} RESTART IDENTITY CASCADE;`);
+        }
       }
 
       if ((idx + 1) % 10 === 0 && idx + 1 < orderedTables.length) {
@@ -842,12 +937,12 @@ async function main() {
 
     await reconnect("constraint and index sync");
 
-    for (const table of sourceTables) {
+    for (const table of tablesToMigrate) {
       await syncConstraints(sourceClient, targetClient, table, ["f"]);
     }
     await restoreForeignKeys(targetClient, droppedTargetForeignKeys);
 
-    for (const table of sourceTables) {
+    for (const table of tablesToMigrate) {
       await syncIndexes(sourceClient, targetClient, table);
     }
 

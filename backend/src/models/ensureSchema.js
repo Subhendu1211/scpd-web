@@ -376,6 +376,35 @@ export async function ensureCmsMediaFileBytesColumn() {
   }
 }
 
+export async function ensureCmsMediaFileChunksTable() {
+  const client = await pool.connect();
+  try {
+    const tableCheck = await client.query(
+      "SELECT to_regclass('public.cms_media') IS NOT NULL AS exists",
+    );
+    if (!tableCheck.rows?.[0]?.exists) {
+      return;
+    }
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cms_media_file_chunks (
+        media_id INTEGER NOT NULL REFERENCES cms_media(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        chunk_bytes BYTEA NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (media_id, chunk_index)
+      )
+    `);
+  } catch (error) {
+    console.warn(
+      "DB schema check: unable to ensure cms_media_file_chunks table:",
+      error,
+    );
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCmsMediaCaptionTextColorColumn() {
   const client = await pool.connect();
   try {
