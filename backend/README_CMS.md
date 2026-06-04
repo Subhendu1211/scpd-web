@@ -102,9 +102,10 @@ Base: `/api`
 - Colors expect hex like `#1b6dd1`; paths should start with `/`; slugs should be URL-friendly (a-z0-9-).
 - For Odisha Govt SMS OTP, configure:
 - `GOVT_SMS_API_URL` (optional, defaults to `https://govtsms.odisha.gov.in/api/api.php`)
-- `GOVT_SMS_SOURCE`
-- `GOVT_SMS_DEPARTMENT_ID`
-- `GOVT_SMS_TEMPLATE_ID`
+- `GOVT_SMS_SOURCE` (optional override; defaults to the approved SCPD sender)
+- `GOVT_SMS_SOURCE_FALLBACKS` (optional override; defaults to the approved fallback sender)
+- `GOVT_SMS_DEPARTMENT_ID` (optional override; defaults to the approved SCPD department ID)
+- `GOVT_SMS_OTP_TEMPLATE_ID` (optional override; defaults to the approved SCPD OTP template)
 - `GOVT_SMS_OTP_CONTENT` (template text with OTP token; supported: `{#var#}` or `#numeric#`/`#number#`; quote this value in `.env` because `#` starts a comment when unquoted)
 - `GOVT_SMS_STRIP_COUNTRY_CODE=true` is recommended when mobile numbers are stored as `91XXXXXXXXXX` but gateway expects local 10-digit recipient numbers.
 - If your provider rejects `sendOTPSMS`, set `GOVT_SMS_OTP_ACTION=singleSMS` and keep template/content aligned with the DLT-approved text.

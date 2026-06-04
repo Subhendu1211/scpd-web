@@ -17,6 +17,10 @@ import {
 } from "./models/ensureSchema.js";
 import { checkDbHealth, getDbRuntimeInfo } from "./models/db.js";
 import { fetchMediaBinaryByFileName } from "./services/adminMediaService.js";
+import {
+  isGovtSmsConfigured,
+  isTwilioVerifyConfigured,
+} from "./services/notificationService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +81,10 @@ app.get("/api/health", async (_req, res) => {
     const db = await checkDbHealth();
     return res.json({
       ok: true,
+      notifications: {
+        govtSmsConfigured: isGovtSmsConfigured(),
+        twilioVerifyConfigured: isTwilioVerifyConfigured(),
+      },
       db: {
         connected: true,
         database: db?.database || null,

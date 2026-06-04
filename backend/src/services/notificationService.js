@@ -9,6 +9,10 @@ const DEFAULT_COMPLAINT_SMS_CONTENT =
   "SCPD, Govt. of Odisha: Your complaint has been successfully submitted on SCPD Portal. It will be reviewed and necessary action will be taken. For assistance call 0674-2954518.";
 const DEFAULT_OTP_SMS_CONTENT =
   "SCPD, Govt. of Odisha: {#var#} is your OTP for login to SCPD Portal. Valid for 15 minutes only. Do not disclose it to anyone. For assistance call 0674-2954518.";
+const DEFAULT_GOVT_SMS_SOURCE = "ODIGOV";
+const DEFAULT_GOVT_SMS_SOURCE_FALLBACKS = ["ODSAMS"];
+const DEFAULT_GOVT_SMS_DEPARTMENT_ID = "D056002";
+const DEFAULT_OTP_TEMPLATE_ID = "1007556907987287759";
 const DEFAULT_REGISTRATION_TEMPLATE_ID = "1007658595469878380";
 const DEFAULT_COMPLAINT_TEMPLATE_ID = "1007977038878676392";
 
@@ -161,9 +165,10 @@ export function isTwilioVerifyConfigured() {
 }
 
 export function isGovtSmsConfigured() {
-  return (
-    !!process.env.GOVT_SMS_SOURCE &&
-    !!process.env.GOVT_SMS_DEPARTMENT_ID
+  return Boolean(
+    getGovtSmsSourceCandidates().length &&
+      getGovtSmsDepartmentId() &&
+      getGovtSmsOtpTemplateId(),
   );
 }
 
@@ -205,13 +210,34 @@ function buildGovtSmsContent(code) {
 }
 
 function getGovtSmsSourceCandidates() {
-  const primary = cleanProviderValue(process.env.GOVT_SMS_SOURCE);
-  const fallbacks = String(process.env.GOVT_SMS_SOURCE_FALLBACKS || "")
-    .split(",")
-    .map((value) => cleanProviderValue(value))
-    .filter(Boolean);
+  const primary =
+    cleanProviderValue(process.env.GOVT_SMS_SOURCE) ||
+    DEFAULT_GOVT_SMS_SOURCE;
+  const configuredFallbacks = cleanProviderValue(
+    process.env.GOVT_SMS_SOURCE_FALLBACKS,
+  );
+  const fallbacks = configuredFallbacks
+    ? configuredFallbacks
+        .split(",")
+        .map((value) => cleanProviderValue(value))
+        .filter(Boolean)
+    : DEFAULT_GOVT_SMS_SOURCE_FALLBACKS;
 
   return Array.from(new Set([primary, ...fallbacks].filter(Boolean)));
+}
+
+function getGovtSmsDepartmentId() {
+  return normalizeDepartmentId(
+    process.env.GOVT_SMS_DEPARTMENT_ID || DEFAULT_GOVT_SMS_DEPARTMENT_ID,
+  );
+}
+
+function getGovtSmsOtpTemplateId() {
+  return cleanProviderValue(
+    process.env.GOVT_SMS_OTP_TEMPLATE_ID ||
+      process.env.GOVT_SMS_TEMPLATE_ID ||
+      DEFAULT_OTP_TEMPLATE_ID,
+  );
 }
 
 function isSenderDeptTemplateMismatchError(message) {
@@ -227,9 +253,13 @@ async function sendGovtSmsMessage({
   action,
   sourceOverride,
 }) {
-  const source = cleanProviderValue(sourceOverride || process.env.GOVT_SMS_SOURCE);
-  const departmentId = normalizeDepartmentId(process.env.GOVT_SMS_DEPARTMENT_ID);
-  const resolvedTemplateId = cleanProviderValue(templateId || process.env.GOVT_SMS_TEMPLATE_ID);
+  const source = cleanProviderValue(
+    sourceOverride || process.env.GOVT_SMS_SOURCE || DEFAULT_GOVT_SMS_SOURCE,
+  );
+  const departmentId = getGovtSmsDepartmentId();
+  const resolvedTemplateId = cleanProviderValue(
+    templateId || process.env.GOVT_SMS_TEMPLATE_ID || DEFAULT_OTP_TEMPLATE_ID,
+  );
   const endpoint =
     process.env.GOVT_SMS_API_URL || "https://govtsms.odisha.gov.in/api/api.php";
 
@@ -397,8 +427,7 @@ async function sendGovtSmsOtp({ destination, code }) {
     process.env.GOVT_SMS_OTP_ACTION || "sendOTPSMS",
   );
   const sendBothActions = isTruthy(process.env.GOVT_SMS_OTP_SEND_BOTH_ACTIONS);
-  const templateId =
-    process.env.GOVT_SMS_OTP_TEMPLATE_ID || process.env.GOVT_SMS_TEMPLATE_ID;
+  const templateId = getGovtSmsOtpTemplateId();
   const content = buildGovtSmsContent(code);
 
   try {
