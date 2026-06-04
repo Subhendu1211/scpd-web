@@ -74,7 +74,7 @@ export const STATIC_NAV_ITEMS: NavItem[] = [
     to: "/grievances",
     children: [
       { key: "nav.grievances.howTo", label: "How to Register a Complaint", to: "/grievances/how-to-register" },
-      { key: "nav.grievances.register", label: "Register a Complaint", to: "http://localhost:5173/login/citizen" },
+      { key: "nav.grievances.register", label: "Register a Complaint", to: "https://case-management-system-kty1.onrender.com/login/citizen" },
       { key: "nav.grievances.orders", label: "Orders of SCPD", to: "/grievances/final-orders" },
       { key: "nav.grievances.interim", label: "Interim Orders of SCPD", to: "/grievances/interim-orders" },
       { key: "nav.grievances.causeList", label: "Cause List", to: "/grievances/cause-list" },
@@ -288,10 +288,7 @@ export function getSearchableNavItems(items: NavItem[]): NavChild[] {
 }
 
 export default function MainNav() {
-  const CITIZEN_LOGIN_URL = "http://localhost:5173/login/citizen";
-  const EXTERNAL_NOTIFICATIONS_URL = "https://ssepd.odisha.gov.in/en/notifications/notification";
-  const EXTERNAL_DISABILITY_POLICIES_URL =
-    "https://ssepd.odisha.gov.in/en/publication/ssedp-laws-policies-schemes";
+  const CITIZEN_LOGIN_URL = "https://case-management-system-kty1.onrender.com/login/citizen";
   const SAME_TAB_EXTERNAL_URLS = new Set<string>();
   const { t } = useTranslation();
   const [navItems, setNavItems] = useState<NavItem[]>(STATIC_NAV_ITEMS);

@@ -24,7 +24,7 @@ export default function SideLayout({
   menuItems: MenuItem[];
 }) {
   const { t } = useTranslation();
-  const CITIZEN_LOGIN_URL = "http://localhost:5173/login/citizen";
+  const CITIZEN_LOGIN_URL = "https://case-management-system-kty1.onrender.com/login/citizen";
   const EXTERNAL_NOTIFICATIONS_URL = "https://ssepd.odisha.gov.in/en/notifications/notification";
   const EXTERNAL_DISABILITY_POLICIES_URL =
     "https://ssepd.odisha.gov.in/en/publication/ssedp-laws-policies-schemes";

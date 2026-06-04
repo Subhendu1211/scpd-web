@@ -9,7 +9,7 @@ const baseGrievanceMenu = [
     label: "nav.grievances.howTo",
     to: "/grievances/how-to-register",
   },
-  { label: "nav.grievances.register", to: "http://localhost:5173/login/citizen" },
+  { label: "nav.grievances.register", to: "https://case-management-system-kty1.onrender.com/login/citizen" },
   { label: "nav.grievances.orders", to: "/grievances/final-orders" },
   { label: "nav.grievances.interim", to: "/grievances/interim-orders" },
   { label: "nav.grievances.causeList", to: "/grievances/cause-list" },

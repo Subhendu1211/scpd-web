@@ -47,7 +47,7 @@ export type CaseRole = "LEGAL_OFFICER" | "CITIZEN" | string;
 
 export function getCaseManagementLoginUrl(role?: CaseRole): string {
 	if (role === "CITIZEN") {
-		return "http://localhost:5173/login/citizen";
+		return "https://case-management-system-kty1.onrender.com/login/citizen";
 	}
 
 	const env = import.meta.env as unknown as CaseMgmtEnv & Record<string, any>;
@@ -84,7 +84,7 @@ export function getCaseManagementLoginUrl(role?: CaseRole): string {
 		try {
 			// If raw is absolute, this succeeds
 			return new URL(raw);
-		} catch (e) {
+		} catch {
 			// Otherwise resolve relative to base
 			return new URL(raw, base);
 		}
@@ -101,7 +101,7 @@ export function getCaseManagementLoginUrl(role?: CaseRole): string {
 	try {
 		const returnUrl = `${window.location.origin.replace(/\/$/, "")}/`;
 		urlObj.searchParams.set("returnUrl", returnUrl);
-	} catch (e) {
+	} catch {
 		// fallback: do nothing if window is unavailable (e.g. SSR)
 	}
 
