@@ -600,7 +600,7 @@ export default function HeaderBar() {
                           type="button"
                           onClick={() => {
                             setOpen(false);
-                            window.location.assign("http://localhost:5173/login");
+                            window.location.assign("https://case-management-system-kty1.onrender.com");
                           }}
                           className="w-full px-5 py-4 flex items-center gap-4 
                      hover:bg-gray-100 transition-all duration-300"
