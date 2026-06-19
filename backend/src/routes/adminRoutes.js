@@ -36,6 +36,17 @@ const loginRateLimiter = rateLimit({
   },
 });
 
+const passwordResetRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error:
+      "Too many password reset requests from this IP. Please try again after 15 minutes.",
+  },
+});
+
 const WORKFLOW_STATUSES = [
   "draft",
   "department_review",
@@ -168,6 +179,7 @@ router.post(
 
 router.post(
   "/auth/forgot-password",
+  passwordResetRateLimiter,
   [
     body("email")
       .optional({ values: "falsy" })
@@ -213,6 +225,7 @@ router.post(
 
 router.post(
   "/auth/reset-password",
+  passwordResetRateLimiter,
   [
     body("email").isEmail().withMessage("Valid email is required"),
     body("otp")

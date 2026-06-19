@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { requestAdminPasswordReset, resetAdminPassword } from "../api";
 
@@ -14,29 +14,33 @@ const AdminForgotPassword: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const requestInFlight = useRef(false);
 
   const [summary, setSummary] = useState<{ channel: "email" | "sms"; masked: string } | null>(null);
 
   const handleRequest = async (event: React.FormEvent) => {
     event.preventDefault();
-    setLoading(true);
     setMessage(null);
     setError(null);
-    try {
-      const payload: { email?: string; phone?: string; channel?: "email" | "sms" } = {};
-      if (email.trim()) {
-        payload.email = email.trim().toLowerCase();
-      }
-      if (phone.trim()) {
-        payload.phone = phone.trim();
-      }
-      payload.channel = channel;
-      if (!payload.email) {
-        setError("Please enter your registered email address.");
-        setLoading(false);
-        return;
-      }
+    if (requestInFlight.current) {
+      return;
+    }
+    const payload: { email?: string; phone?: string; channel?: "email" | "sms" } = {};
+    if (email.trim()) {
+      payload.email = email.trim().toLowerCase();
+    }
+    if (phone.trim()) {
+      payload.phone = phone.trim();
+    }
+    payload.channel = channel;
+    if (!payload.email) {
+      setError("Please enter your registered email address.");
+      return;
+    }
 
+    requestInFlight.current = true;
+    setLoading(true);
+    try {
       const response = await requestAdminPasswordReset(payload);
       const resolvedChannel = response.channel ?? channel;
       const maskedDestination = response.destination
@@ -52,21 +56,26 @@ const AdminForgotPassword: React.FC = () => {
       const msg = err.response?.data?.error || "Unable to process request";
       setError(msg);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
 
   const handleReset = async (event: React.FormEvent) => {
     event.preventDefault();
-    setLoading(true);
     setError(null);
     setMessage(null);
+    if (requestInFlight.current) {
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    requestInFlight.current = true;
+    setLoading(true);
     try {
-      if (password !== confirmPassword) {
-        setError("Passwords do not match.");
-        setLoading(false);
-        return;
-      }
       const identifier = email.trim().toLowerCase();
       await resetAdminPassword({ email: identifier, otp: otp.trim(), password });
       setMessage("Password updated. You may now sign in.");
@@ -75,6 +84,7 @@ const AdminForgotPassword: React.FC = () => {
       const msg = err.response?.data?.error || "Unable to reset password";
       setError(msg);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
@@ -91,7 +101,7 @@ const AdminForgotPassword: React.FC = () => {
         <ul className="admin-auth-points">
           <li>OTP expiry window: 10 minutes</li>
           <li>Email is required for identity matching</li>
-          <li>SMS or WhatsApp delivery can be used when available</li>
+          <li>SMS delivery can be used when available</li>
         </ul>
       </section>
 
@@ -154,7 +164,7 @@ const AdminForgotPassword: React.FC = () => {
                     checked={channel === "sms"}
                     onChange={() => setChannel("sms")}
                   />
-                  SMS / WhatsApp
+                  SMS
                 </label>
               </fieldset>
             </>
