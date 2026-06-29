@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import bcrypt from "bcrypt";
+import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,7 +90,7 @@ function resolveDefaultAdminSeedConfig() {
 
   return {
     email: "admin@example.com",
-    password: "admin123",
+    password: "Admin@123456",
     role: "superadmin",
     fullName: "Local Dev Admin",
   };
@@ -121,9 +122,10 @@ export async function ensureDefaultAdminUser() {
       return;
     }
 
-    if (seedConfig.password.length < 8) {
+    const passwordPolicyError = validatePasswordPolicy(seedConfig.password);
+    if (passwordPolicyError) {
       console.warn(
-        "Default admin password is too short. Set DEFAULT_ADMIN_PASSWORD with at least 8 characters.",
+        `Default admin password is not strong enough: ${passwordPolicyError}`,
       );
       return;
     }

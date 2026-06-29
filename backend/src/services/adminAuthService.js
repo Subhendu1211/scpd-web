@@ -12,6 +12,7 @@ import {
   verifyTwilioOtp,
 } from "./notificationService.js";
 import { ADMIN_ROLES } from "../constants/adminRoles.js";
+import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 
 function normalizeRoleString(role) {
   if (!role || typeof role !== "string") return role;
@@ -31,6 +32,24 @@ const LOGIN_OTP_EXPIRY_MINUTES = Number(
 );
 const MAX_LOGIN_OTP_ATTEMPTS = Number(
   process.env.ADMIN_LOGIN_OTP_MAX_ATTEMPTS || 5,
+);
+const LOGIN_OTP_RESEND_COOLDOWN_SECONDS = Number(
+  process.env.ADMIN_LOGIN_OTP_RESEND_COOLDOWN_SECONDS || 60,
+);
+const LOGIN_OTP_RATE_WINDOW_SECONDS = Number(
+  process.env.ADMIN_LOGIN_OTP_RATE_WINDOW_SECONDS || 15 * 60,
+);
+const LOGIN_OTP_MAX_PER_WINDOW = Number(
+  process.env.ADMIN_LOGIN_OTP_MAX_PER_WINDOW || 5,
+);
+const RESET_OTP_RESEND_COOLDOWN_SECONDS = Number(
+  process.env.ADMIN_RESET_OTP_RESEND_COOLDOWN_SECONDS || 60,
+);
+const RESET_OTP_RATE_WINDOW_SECONDS = Number(
+  process.env.ADMIN_RESET_OTP_RATE_WINDOW_SECONDS || 15 * 60,
+);
+const RESET_OTP_MAX_PER_WINDOW = Number(
+  process.env.ADMIN_RESET_OTP_MAX_PER_WINDOW || 3,
 );
 
 // Login lockout settings
@@ -71,6 +90,53 @@ function maskDestination(value, channel) {
 
 function generateOtp() {
   return crypto.randomInt(100000, 1000000).toString();
+}
+
+function rateLimitError(message) {
+  const error = new Error(message);
+  error.code = "OTP_RATE_LIMITED";
+  return error;
+}
+
+async function enforceOtpRequestLimit({
+  client,
+  tableName,
+  userId,
+  destination,
+  cooldownSeconds,
+  windowSeconds,
+  maxPerWindow,
+  purpose,
+}) {
+  const recent = await client.query(
+    `SELECT created_at
+       FROM ${tableName}
+      WHERE admin_user_id = $1
+        AND ($2::text IS NULL OR destination = $2)
+        AND created_at >= now() - ($3::int * interval '1 second')
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [userId, destination || null, cooldownSeconds],
+  );
+  if (recent.rows.length) {
+    throw rateLimitError(
+      `Please wait before requesting another ${purpose} OTP.`,
+    );
+  }
+
+  const countResult = await client.query(
+    `SELECT count(*)::int AS count
+       FROM ${tableName}
+      WHERE admin_user_id = $1
+        AND ($2::text IS NULL OR destination = $2)
+        AND created_at >= now() - ($3::int * interval '1 second')`,
+    [userId, destination || null, windowSeconds],
+  );
+  if (Number(countResult.rows[0]?.count || 0) >= maxPerWindow) {
+    throw rateLimitError(
+      `Too many ${purpose} OTP requests. Please try again later.`,
+    );
+  }
 }
 
 function parseIdentifier(identifier) {
@@ -294,6 +360,16 @@ export async function initiateAdminLoginOtp({
       validated,
       preferredChannel,
     );
+    await enforceOtpRequestLimit({
+      client,
+      tableName: "admin_login_otps",
+      userId: validated.id,
+      destination,
+      cooldownSeconds: LOGIN_OTP_RESEND_COOLDOWN_SECONDS,
+      windowSeconds: LOGIN_OTP_RATE_WINDOW_SECONDS,
+      maxPerWindow: LOGIN_OTP_MAX_PER_WINDOW,
+      purpose: "login",
+    });
 
     const otp = generateOtp();
     const hash = await bcrypt.hash(otp, 10);
@@ -516,6 +592,16 @@ export async function initiatePasswordReset({
       user,
       preferredChannel,
     );
+    await enforceOtpRequestLimit({
+      client,
+      tableName: "admin_password_resets",
+      userId: user.id,
+      destination,
+      cooldownSeconds: RESET_OTP_RESEND_COOLDOWN_SECONDS,
+      windowSeconds: RESET_OTP_RATE_WINDOW_SECONDS,
+      maxPerWindow: RESET_OTP_MAX_PER_WINDOW,
+      purpose: "password reset",
+    });
 
     const otp = generateOtp();
     const hash = await bcrypt.hash(otp, 10);
@@ -567,6 +653,11 @@ export async function resetPasswordWithOtp({
 }) {
   if (!email || !otp || !newPassword) {
     throw new Error("Missing required fields");
+  }
+
+  const passwordPolicyError = validatePasswordPolicy(newPassword);
+  if (passwordPolicyError) {
+    throw new Error(passwordPolicyError);
   }
 
   const normalizedEmail = sanitizeEmail(email);

@@ -12,6 +12,7 @@ import { IoLogoYoutube } from "react-icons/io";
 import { FaSearch } from "react-icons/fa";
 import SiteSearch from "../SiteSearch";
 import { api } from "../../services/api";
+import { validatePasswordPolicy } from "../../utils/passwordPolicy";
 
 type PublicLoginOtpChallenge = {
   challengeId: string;
@@ -307,6 +308,13 @@ export default function HeaderBar() {
     if (authMode === "signup" && !authForm.fullName.trim()) {
       setAuthError("Please enter your full name.");
       return;
+    }
+    if (authMode === "signup") {
+      const passwordError = validatePasswordPolicy(authForm.password);
+      if (passwordError) {
+        setAuthError(passwordError);
+        return;
+      }
     }
     setAuthLoading(true);
     setAuthError("");
@@ -788,6 +796,12 @@ export default function HeaderBar() {
                             value={authForm.password}
                             onChange={(e) => handleAuthChange("password", e.target.value)}
                             autoComplete={authMode === "login" ? "current-password" : "new-password"}
+                            minLength={authMode === "signup" ? 12 : 8}
+                            title={
+                              authMode === "signup"
+                                ? "Use at least 12 characters with uppercase, lowercase, number, and special character."
+                                : undefined
+                            }
                             className="w-full border rounded-xl px-4 py-3 text-base md:text-lg focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder-gray-500"
                           />
 

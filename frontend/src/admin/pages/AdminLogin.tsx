@@ -83,7 +83,7 @@ const AdminLogin: React.FC = () => {
 
   const useDevCredentials = () => {
     setIdentifier("admin@example.com");
-    setPassword("admin123");
+    setPassword("Admin@123456");
     setChannel("email");
     setChallenge(null);
     setOtp("");
@@ -128,7 +128,7 @@ const AdminLogin: React.FC = () => {
               {isDev ? (
                 <div className="admin-login-help" style={{ marginBottom: 12 }}>
                   <span>Local dev login:</span>{" "}
-                  <code>admin@example.com / admin123</code>{" "}
+                  <code>admin@example.com / Admin@123456</code>{" "}
                   <button
                     type="button"
                     className="btn secondary"

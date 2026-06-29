@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { pool } from "../models/db.js";
 import { recordUserLog } from "./auditService.js";
 import { ADMIN_ROLES, DEFAULT_ADMIN_ROLE } from "../constants/adminRoles.js";
+import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 
 function sanitizeEmail(email) {
   return email.trim().toLowerCase();
@@ -63,8 +64,9 @@ export async function createAdminUser({
     throw new Error("Email and password are required");
   }
 
-  if (password.length < 8) {
-    throw new Error("Password must be at least 8 characters long");
+  const passwordPolicyError = validatePasswordPolicy(password);
+  if (passwordPolicyError) {
+    throw new Error(passwordPolicyError);
   }
 
   const normalizedEmail = sanitizeEmail(email);

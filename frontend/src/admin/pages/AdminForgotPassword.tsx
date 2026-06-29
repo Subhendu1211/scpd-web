@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { requestAdminPasswordReset, resetAdminPassword } from "../api";
+import { validatePasswordPolicy } from "../../utils/passwordPolicy";
 
 const AdminForgotPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -70,6 +71,11 @@ const AdminForgotPassword: React.FC = () => {
     }
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+    const passwordError = validatePasswordPolicy(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -195,7 +201,8 @@ const AdminForgotPassword: React.FC = () => {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
-                minLength={8}
+                minLength={12}
+                title="Use at least 12 characters with uppercase, lowercase, number, and special character."
                 autoComplete="new-password"
               />
 
@@ -206,7 +213,8 @@ const AdminForgotPassword: React.FC = () => {
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 required
-                minLength={8}
+                minLength={12}
+                title="Use at least 12 characters with uppercase, lowercase, number, and special character."
                 autoComplete="new-password"
               />
             </>

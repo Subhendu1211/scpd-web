@@ -23,6 +23,7 @@ import {
   requireAdminRole,
 } from "../middleware/authMiddleware.js";
 import { ADMIN_ROLES } from "../constants/adminRoles.js";
+import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 
 // IP-based rate limiter for login endpoints (max 10 attempts per 15 minutes)
 const loginRateLimiter = rateLimit({
@@ -232,8 +233,13 @@ router.post(
       .isLength({ min: 4, max: 10 })
       .withMessage("OTP must be between 4 and 10 characters"),
     body("password")
-      .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters long"),
+      .custom((value) => {
+        const policyError = validatePasswordPolicy(value);
+        if (policyError) {
+          throw new Error(policyError);
+        }
+        return true;
+      }),
   ],
   adminAuthController.resetPassword,
 );
@@ -1083,8 +1089,13 @@ router.post(
   [
     body("email").isEmail().withMessage("Valid email is required"),
     body("password")
-      .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters long"),
+      .custom((value) => {
+        const policyError = validatePasswordPolicy(value);
+        if (policyError) {
+          throw new Error(policyError);
+        }
+        return true;
+      }),
     body("role")
       .optional({ values: "falsy" })
       .isString()

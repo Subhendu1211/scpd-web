@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminRole, AdminUser, createAdminUser, listAdminUsers } from "../api";
 import { useAdminAuth } from "../auth";
+import { validatePasswordPolicy } from "../../utils/passwordPolicy";
 
 interface CreateUserFormState {
   email: string;
@@ -105,9 +106,14 @@ const UserManager: React.FC = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setCreating(true);
     setError(null);
     setSuccess(null);
+    const passwordError = validatePasswordPolicy(form.password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    setCreating(true);
     try {
       const payload = {
         email: form.email.trim().toLowerCase(),
@@ -172,7 +178,8 @@ const UserManager: React.FC = () => {
             value={form.password}
             onChange={handleChange}
             required
-            minLength={8}
+            minLength={12}
+            title="Use at least 12 characters with uppercase, lowercase, number, and special character."
           />
 
           <label htmlFor="admin-user-fullName">Full Name</label>

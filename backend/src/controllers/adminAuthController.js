@@ -76,6 +76,9 @@ export async function requestLoginOtp(req, res) {
     if (error.code === "ACCOUNT_LOCKED") {
       return res.status(429).json({ error: error.message });
     }
+    if (error.code === "OTP_RATE_LIMITED") {
+      return res.status(429).json({ error: error.message });
+    }
     return res
       .status(400)
       .json({ error: error.message || "Unable to process request" });
@@ -139,6 +142,9 @@ export async function requestPasswordReset(req, res) {
       destination: maskDelivery(result.channel, result.destination),
     });
   } catch (error) {
+    if (error.code === "OTP_RATE_LIMITED") {
+      return res.status(429).json({ error: error.message });
+    }
     return res
       .status(400)
       .json({ error: error.message || "Unable to process request" });

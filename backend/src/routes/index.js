@@ -7,6 +7,7 @@ import * as userAuthController from "../controllers/userAuthController.js";
 import * as feedbackController from "../controllers/feedbackController.js";
 import { listSuccessStories } from "../services/adminSuccessStoriesService.js";
 import { body } from "express-validator";
+import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 
 // Simple fallback captions for the hero carousel when CMS content is absent
 const SUCCESS_STORY_CAPTIONS = [
@@ -207,8 +208,13 @@ router.post(
       .matches(/^[0-9+\-\s]{6,20}$/)
       .withMessage("Phone must be 6-20 digits"),
     body("password")
-      .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters"),
+      .custom((value) => {
+        const policyError = validatePasswordPolicy(value);
+        if (policyError) {
+          throw new Error(policyError);
+        }
+        return true;
+      }),
   ],
   userAuthController.signup,
 );

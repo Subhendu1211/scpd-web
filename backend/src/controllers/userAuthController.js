@@ -19,6 +19,9 @@ export async function signup(req, res) {
     if (err.code === "EMAIL_IN_USE") {
       return res.status(409).json({ error: "Email already registered" });
     }
+    if (/^Password must|^Password is too common/.test(err.message || "")) {
+      return res.status(400).json({ error: err.message });
+    }
     return res.status(500).json({ error: "Unable to create account" });
   }
 }
@@ -36,7 +39,10 @@ export async function login(req, res) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
     return res.json(result);
-  } catch (_err) {
+  } catch (err) {
+    if (err.code === "OTP_RATE_LIMITED") {
+      return res.status(429).json({ error: err.message });
+    }
     return res.status(500).json({ error: "Unable to authenticate" });
   }
 }

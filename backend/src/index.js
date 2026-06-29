@@ -54,9 +54,65 @@ try {
 
 const app = express();
 
+app.disable("x-powered-by");
+
 // Trust the first reverse proxy (Nginx) so that express-rate-limit
 // can correctly identify real client IPs via X-Forwarded-For.
 app.set("trust proxy", 1);
+
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV !== "production") {
+    return next();
+  }
+
+  const forwardedProto = req
+    .header("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  const isHttps = req.secure || forwardedProto === "https";
+  if (isHttps) {
+    return next();
+  }
+
+  if (req.method === "GET" || req.method === "HEAD") {
+    const host = req.header("host");
+    if (host) {
+      return res.redirect(308, `https://${host}${req.originalUrl}`);
+    }
+  }
+
+  return res.status(426).json({ error: "HTTPS is required" });
+});
+
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://platform.twitter.com https://translate.google.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "connect-src 'self' https:",
+      "frame-src 'self' https://www.google.com https://maps.google.com https://www.youtube.com https://www.facebook.com https://platform.twitter.com https://www.instagram.com",
+    ].join("; "),
+  );
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains; preload",
+    );
+  }
+  next();
+});
 
 const corsOriginsEnv = process.env.CORS_ORIGINS;
 const corsOrigins = corsOriginsEnv
@@ -106,7 +162,13 @@ app.get("/api/health", async (_req, res) => {
 });
 app.use("/api", apiRouter);
 app.use("/api/admin", adminRouter);
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+const swaggerDocsEnabled =
+  process.env.NODE_ENV !== "production" ||
+  isTruthy(process.env.ENABLE_SWAGGER_DOCS);
+if (swaggerDocsEnabled) {
+  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
 
 // serve built frontend if copied to /public
 app.use(express.static(path.join(__dirname, "..", "public")));

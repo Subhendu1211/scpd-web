@@ -8,10 +8,20 @@ import {
   sendPortalRegistrationNotification,
   verifyTwilioOtp,
 } from "./notificationService.js";
+import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 
 const DEFAULT_EXPIRY = "12h";
 const LOGIN_OTP_EXPIRY_MINUTES = Number(process.env.PUBLIC_LOGIN_OTP_EXPIRY_MINUTES || 10);
 const MAX_LOGIN_OTP_ATTEMPTS = Number(process.env.PUBLIC_LOGIN_OTP_MAX_ATTEMPTS || 5);
+const LOGIN_OTP_RESEND_COOLDOWN_SECONDS = Number(
+  process.env.PUBLIC_LOGIN_OTP_RESEND_COOLDOWN_SECONDS || 60,
+);
+const LOGIN_OTP_RATE_WINDOW_SECONDS = Number(
+  process.env.PUBLIC_LOGIN_OTP_RATE_WINDOW_SECONDS || 15 * 60,
+);
+const LOGIN_OTP_MAX_PER_WINDOW = Number(
+  process.env.PUBLIC_LOGIN_OTP_MAX_PER_WINDOW || 5,
+);
 
 function sanitizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -79,7 +89,44 @@ function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+async function enforcePublicLoginOtpRateLimit(client, userId, destination) {
+  const recent = await client.query(
+    `SELECT created_at
+       FROM public_login_otps
+      WHERE public_user_id = $1
+        AND destination = $2
+        AND created_at >= now() - ($3::int * interval '1 second')
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [userId, destination, LOGIN_OTP_RESEND_COOLDOWN_SECONDS],
+  );
+  if (recent.rows.length) {
+    const error = new Error("Please wait before requesting another login OTP.");
+    error.code = "OTP_RATE_LIMITED";
+    throw error;
+  }
+
+  const countResult = await client.query(
+    `SELECT count(*)::int AS count
+       FROM public_login_otps
+      WHERE public_user_id = $1
+        AND destination = $2
+        AND created_at >= now() - ($3::int * interval '1 second')`,
+    [userId, destination, LOGIN_OTP_RATE_WINDOW_SECONDS],
+  );
+  if (Number(countResult.rows[0]?.count || 0) >= LOGIN_OTP_MAX_PER_WINDOW) {
+    const error = new Error("Too many login OTP requests. Please try again later.");
+    error.code = "OTP_RATE_LIMITED";
+    throw error;
+  }
+}
+
 export async function signupPublicUser({ fullName, email, phone, password }) {
+  const passwordPolicyError = validatePasswordPolicy(password);
+  if (passwordPolicyError) {
+    throw new Error(passwordPolicyError);
+  }
+
   const client = await pool.connect();
   try {
     const normalizedEmail = sanitizeEmail(email);
@@ -159,6 +206,8 @@ export async function authenticatePublicUser({ email, password, channel }) {
     const otpHash = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + LOGIN_OTP_EXPIRY_MINUTES * 60 * 1000);
     const delivery = chooseLoginChannel(user, channel);
+    await enforcePublicLoginOtpRateLimit(client, user.id, delivery.destination);
+
     const challengeId = crypto.randomUUID
       ? crypto.randomUUID()
       : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
