@@ -1,0 +1,62 @@
+[
+  {
+    "column_name": "id",
+    "column_default": "nextval('cms_media_id_seq'::regclass)",
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "file_name",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "original_name",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "mime_type",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "category",
+    "column_default": "'photo'::text",
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "size_bytes",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "alt_text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "column_name": "storage_path",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "file_bytes",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "column_name": "uploaded_by",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "column_name": "created_at",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "column_name": "album_id",
+    "column_default": null,
+    "is_nullable": "YES"
+  }
+]

@@ -1,0 +1,45 @@
+````
+
+````txt
+<vscode_codeblock_uri>file:///c%3A/Sudeep/Techsheel/Project/VSCODEWorkspace/admin/scpd-web/backend/src/services/.gitkeep</vscode_codeblock_uri>````
+
+Infra:
+
+````yaml
+<vscode_codeblock_uri>file:///c%3A/Sudeep/Techsheel/Project/VSCODEWorkspace/admin/scpd-web/infra/docker-compose.yml</vscode_codeblock_uri>version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: scpd
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes:
+      - scpd_db:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4000
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: scpd
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    ports: ["4000:4000"]
+    depends_on: [db]
+
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - ../frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports: ["8080:80"]
+    depends_on: [api]
+
+volumes:
+  scpd_db:

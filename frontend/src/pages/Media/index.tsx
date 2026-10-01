@@ -1,0 +1,1 @@
+import React from "react"; export default function Media(){return <div className="card"><div className="card-body">Media</div></div>;}

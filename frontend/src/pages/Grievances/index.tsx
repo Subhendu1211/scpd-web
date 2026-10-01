@@ -1,0 +1,1 @@
+import React from "react"; export default function Grievances(){return <div className="card"><div className="card-body">Grievances</div></div>;}

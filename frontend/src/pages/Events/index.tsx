@@ -1,0 +1,1 @@
+import React from "react"; export default function Events(){return <div className="card"><div className="card-body">Events</div></div>;}

@@ -1,0 +1,37 @@
+
+C:\Projects\admin-t\scpd-web\frontend\src\admin\pages\PagesManager.tsx
+  88:7  error  'CMS_STATUS_OPTIONS' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Projects\admin-t\scpd-web\frontend\src\components\HeaderBar\Demo.tsx
+  1:8  error  'React' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Projects\admin-t\scpd-web\frontend\src\components\NewsGallery\index.tsx
+  66:9  error  'fmt' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Projects\admin-t\scpd-web\frontend\src\components\common\CmsTable.tsx
+  237:38  error  Unnecessary escape character: \/  no-useless-escape
+  237:52  error  Unnecessary escape character: \/  no-useless-escape
+
+C:\Projects\admin-t\scpd-web\frontend\src\components\homepagecomponents\GalleryHome.tsx
+  10:25  error  'CmsMediaItem' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Projects\admin-t\scpd-web\frontend\src\components\homepagecomponents\Notification.tsx
+   98:40  error  Unnecessary escape character: \/                                                        no-useless-escape
+   98:54  error  Unnecessary escape character: \/                                                        no-useless-escape
+  114:9   error  'formatRange' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Projects\admin-t\scpd-web\frontend\src\components\homepagecomponents\SocilaMediaPage.tsx
+  23:16  error  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Projects\admin-t\scpd-web\frontend\src\components\homepagecomponents\TabComponents.tsx
+  160:40  error  Unnecessary escape character: \/                                                      no-useless-escape
+  160:54  error  Unnecessary escape character: \/                                                      no-useless-escape
+  203:13  error  'published' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  365:13  error  'published' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Projects\admin-t\scpd-web\frontend\src\utils\externalNavigation.ts
+   83:12  error  'e' is defined but never used  @typescript-eslint/no-unused-vars
+  100:11  error  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 16 problems (16 errors, 0 warnings)
+

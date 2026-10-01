@@ -1,0 +1,39 @@
+services:
+  scpd-web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: scpd-web-app
+    env_file:
+      - ../backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+    expose:
+      - "4000"
+    volumes:
+      - scpd_web_uploads:/app/uploads
+    networks:
+      - scpd-edge
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: scpd-edge-nginx
+    depends_on:
+      - scpd-web
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - scpd-edge
+    restart: unless-stopped
+
+networks:
+  scpd-edge:
+    name: scpd-edge
+    external: true
+
+volumes:
+  scpd_web_uploads:

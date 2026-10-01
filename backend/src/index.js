@@ -1,0 +1,250 @@
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
+import apiRouter from "./routes/index.js";
+import adminRouter from "./routes/adminRoutes.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./swagger.js";
+import {
+  ensureBaseCmsSchema,
+  ensureCmsMediaCaptionTextColorColumn,
+  ensureCmsMediaCategoryConstraint,
+  ensureCmsMediaFileChunksTable,
+  ensureCmsMediaFileBytesColumn,
+} from "./models/ensureSchema.js";
+import { checkDbHealth, getDbRuntimeInfo } from "./models/db.js";
+import { fetchMediaBinaryByFileName } from "./services/adminMediaService.js";
+import {
+  isGovtSmsConfigured,
+  isTwilioVerifyConfigured,
+} from "./services/notificationService.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function isTruthy(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
+}
+
+const shouldLoadDotenv =
+  process.env.NODE_ENV !== "production" ||
+  isTruthy(process.env.LOAD_DOTENV_IN_PRODUCTION);
+if (shouldLoadDotenv) {
+  dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+}
+
+// Debug: print DB environment so we can verify which Postgres instance we're using
+try {
+  console.debug("DB env:", {
+    DB_NAME: process.env.DB_NAME || process.env.PGDATABASE,
+    DB_HOST: process.env.DB_HOST || process.env.PGHOST,
+    DB_PORT: process.env.DB_PORT || process.env.PGPORT,
+    DB_USER: process.env.DB_USER || process.env.PGUSER,
+    DB_SSL: process.env.DB_SSL,
+  });
+} catch (e) {
+  /* ignore */
+}
+
+const app = express();
+
+app.disable("x-powered-by");
+
+// Trust the first reverse proxy (Nginx) so that express-rate-limit
+// can correctly identify real client IPs via X-Forwarded-For.
+app.set("trust proxy", 1);
+
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV !== "production") {
+    return next();
+  }
+
+  const forwardedProto = req
+    .header("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  const isHttps = req.secure || forwardedProto === "https";
+  if (isHttps) {
+    return next();
+  }
+
+  if (req.method === "GET" || req.method === "HEAD") {
+    const host = req.header("host");
+    if (host) {
+      return res.redirect(308, `https://${host}${req.originalUrl}`);
+    }
+  }
+
+  return res.status(426).json({ error: "HTTPS is required" });
+});
+
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://platform.twitter.com https://translate.google.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "connect-src 'self' https:",
+      "frame-src 'self' https://www.google.com https://maps.google.com https://www.youtube.com https://www.facebook.com https://platform.twitter.com https://www.instagram.com",
+    ].join("; "),
+  );
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains; preload",
+    );
+  }
+  next();
+});
+
+const corsOriginsEnv = process.env.CORS_ORIGINS;
+const corsOrigins = corsOriginsEnv
+  ? corsOriginsEnv
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+  : null;
+
+app.use(
+  cors({
+    origin: corsOrigins ?? true,
+    credentials: false,
+  }),
+);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.get("/api/health", async (_req, res) => {
+  const runtime = getDbRuntimeInfo();
+  try {
+    const db = await checkDbHealth();
+    return res.json({
+      ok: true,
+      notifications: {
+        govtSmsConfigured: isGovtSmsConfigured(),
+        twilioVerifyConfigured: isTwilioVerifyConfigured(),
+      },
+      db: {
+        connected: true,
+        database: db?.database || null,
+        user: db?.username || null,
+        runtime,
+      },
+    });
+  } catch (error) {
+    console.error("Health check DB error:", error?.message || error);
+    return res.status(503).json({
+      ok: false,
+      db: {
+        connected: false,
+        runtime,
+        errorCode: error?.code || null,
+      },
+    });
+  }
+});
+app.use("/api", apiRouter);
+app.use("/api/admin", adminRouter);
+
+const swaggerDocsEnabled =
+  process.env.NODE_ENV !== "production" ||
+  isTruthy(process.env.ENABLE_SWAGGER_DOCS);
+if (swaggerDocsEnabled) {
+  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
+
+// serve built frontend if copied to /public
+app.use(express.static(path.join(__dirname, "..", "public")));
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
+
+// Fallback: if a media file is missing on disk, serve it from DB.
+// This keeps existing URLs working: /uploads/media/<file_name>
+app.get("/uploads/media/:fileName", async (req, res) => {
+  const { fileName } = req.params;
+  try {
+    const binary = await fetchMediaBinaryByFileName(fileName);
+    if (!binary) {
+      return res.status(404).json({ error: "Media not found" });
+    }
+    res.setHeader(
+      "Content-Type",
+      binary.mimeType || "application/octet-stream",
+    );
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.status(200).send(binary.fileBytes);
+  } catch (error) {
+    console.warn("Unable to serve media fallback from DB", error);
+    return res.status(500).json({ error: "Unable to fetch media" });
+  }
+});
+
+// SPA fallback for frontend routes on production host (e.g. /events/workshops-awareness).
+// Keep API and uploads routes out of this fallback.
+app.get(/^\/(?!api(?:\/|$)|uploads(?:\/|$)).*/, (_req, res, next) => {
+  const indexPath = path.join(__dirname, "..", "public", "index.html");
+  if (!indexPath) return next();
+  return res.sendFile(indexPath, (err) => {
+    if (err) next(err);
+  });
+});
+
+app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      const configuredMediaMaxFileSize = Number(process.env.MEDIA_MAX_FILE_SIZE);
+      if (Number.isFinite(configuredMediaMaxFileSize) && configuredMediaMaxFileSize > 0) {
+        const maxMb = Math.round(configuredMediaMaxFileSize / (1024 * 1024));
+        return res
+          .status(413)
+          .json({ error: `File too large. Maximum upload size is ${maxMb} MB.` });
+      }
+      return res
+        .status(413)
+        .json({ error: "File too large." });
+    }
+    return res.status(400).json({ error: err.message || "Upload failed" });
+  }
+  if (err?.type === "entity.parse.failed" || err instanceof SyntaxError) {
+    return res.status(400).json({ error: "Invalid JSON payload." });
+  }
+  console.error(err);
+  res.status(500).json({ error: "Internal server error" });
+});
+
+const PORT = process.env.PORT || 4000;
+
+app.listen(PORT, () => {
+  console.log(`API listening on http://localhost:${PORT}`);
+});
+
+// Run schema/bootstrap tasks in background.
+// In cloud environments, hard-failing process startup causes generic App Service
+// "Application Error" pages. We keep the server online and log bootstrap issues.
+(async () => {
+  try {
+    await ensureBaseCmsSchema();
+    await ensureCmsMediaCategoryConstraint();
+    await ensureCmsMediaFileBytesColumn();
+    await ensureCmsMediaFileChunksTable();
+    await ensureCmsMediaCaptionTextColorColumn();
+  } catch (error) {
+    console.error("Startup bootstrap warning (server still running):", error);
+  }
+})();

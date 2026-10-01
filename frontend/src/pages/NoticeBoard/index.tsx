@@ -1,0 +1,1 @@
+import React from "react"; export default function NoticeBoard(){return <div className="card"><div className="card-body">Notice Board</div></div>;}
