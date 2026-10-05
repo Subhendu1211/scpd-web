@@ -87,8 +87,10 @@ const ADMIN_USER_MANAGER_ROLES = ["superadmin", "admin"];
 
 const router = Router();
 const configuredMediaMaxFileSize = Number(process.env.MEDIA_MAX_FILE_SIZE);
-const hasUploadSizeLimit =
-  Number.isFinite(configuredMediaMaxFileSize) && configuredMediaMaxFileSize > 0;
+const defaultMediaMaxFileSize = 100 * 1024 * 1024;
+const mediaMaxFileSize = Number.isFinite(configuredMediaMaxFileSize) && configuredMediaMaxFileSize > 0
+  ? Math.min(configuredMediaMaxFileSize, defaultMediaMaxFileSize)
+  : defaultMediaMaxFileSize;
 
 const tempUploadDir = path.resolve(process.cwd(), "uploads", "tmp");
 if (!fs.existsSync(tempUploadDir)) {
@@ -96,12 +98,8 @@ if (!fs.existsSync(tempUploadDir)) {
 }
 const uploadConfig = {
   dest: tempUploadDir,
+  limits: { fileSize: mediaMaxFileSize, files: 50, fields: 50, parts: 110 },
 };
-if (hasUploadSizeLimit) {
-  uploadConfig.limits = {
-    fileSize: configuredMediaMaxFileSize,
-  };
-}
 const upload = multer(uploadConfig);
 
 /**

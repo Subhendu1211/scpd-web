@@ -26,12 +26,17 @@ export function getCaseManagementDashboardUrl(): string {
 
 	// If explicitly configured, use it as-is.
 	if (env.VITE_CASE_MGMT_DASHBOARD_URL?.trim()) {
-		return env.VITE_CASE_MGMT_DASHBOARD_URL.trim();
+		const explicitUrl = env.VITE_CASE_MGMT_DASHBOARD_URL.trim();
+		if (isPublicProductionSite() && isLoopbackUrl(explicitUrl)) {
+			return new URL("/case-management/dashboard/", window.location.origin).toString();
+		}
+		return explicitUrl;
 	}
 
-	const base = normalizeBaseUrl(env.VITE_CASE_MGMT_BASE_URL) || window.location.origin;
+	const { base, hasUnsafeLoopbackBase } = getSafeCaseManagementBase(env.VITE_CASE_MGMT_BASE_URL);
 	const path = normalizePath(env.VITE_CASE_MGMT_DASHBOARD_PATH ?? "") || "/";
-	return new URL(path, base).toString();
+	const safePath = hasUnsafeLoopbackBase ? `/case-management${path}` : path;
+	return new URL(safePath, base).toString();
 }
 
 export function redirectToCaseManagementDashboard(): void {
@@ -43,11 +48,46 @@ function normalizeBaseUrl(value?: string) {
 	return value.replace(/\/+$/g, "");
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+	const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+	return normalized === "localhost" ||
+		normalized.endsWith(".localhost") ||
+		normalized === "::1" ||
+		/^127(?:\.\d{1,3}){3}$/.test(normalized);
+}
+
+function isLoopbackUrl(value: string): boolean {
+	try {
+		return isLoopbackHostname(new URL(value).hostname);
+	} catch {
+		return false;
+	}
+}
+
+function isPublicProductionSite(): boolean {
+	return import.meta.env.PROD && !isLoopbackHostname(window.location.hostname);
+}
+
+function getSafeCaseManagementBase(value?: string): {
+	base: string;
+	hasUnsafeLoopbackBase: boolean;
+} {
+	const configuredBase = normalizeBaseUrl(value);
+	const hasUnsafeLoopbackBase = isPublicProductionSite() && isLoopbackUrl(configuredBase);
+	return {
+		base: hasUnsafeLoopbackBase ? window.location.origin : configuredBase || window.location.origin,
+		hasUnsafeLoopbackBase,
+	};
+}
+
 export type CaseRole = "LEGAL_OFFICER" | "CITIZEN" | string;
 
 export function getCaseManagementLoginUrl(role?: CaseRole): string {
 	const env = import.meta.env as unknown as CaseMgmtEnv & Record<string, any>;
-	const base = normalizeBaseUrl(env.VITE_CASE_MGMT_BASE_URL) || window.location.origin;
+	const isProductionSite = isPublicProductionSite();
+	// A local .env.local value can accidentally be included in a production
+	// build. Never send public users to their own device's localhost server.
+	const { base, hasUnsafeLoopbackBase } = getSafeCaseManagementBase(env.VITE_CASE_MGMT_BASE_URL);
 	// Prefer explicit per-role override if present
 	// Do NOT default to an external /login/citizen URL when no explicit
 	// env var is provided. This prevents accidental redirects to
@@ -70,7 +110,10 @@ export function getCaseManagementLoginUrl(role?: CaseRole): string {
 				: role === "CITIZEN"
 					? "/login/citizen"
 					: "/login";
-		return new URL(localPath, base).toString();
+		const safePath = hasUnsafeLoopbackBase
+			? `/case-management${localPath}`
+			: localPath;
+		return new URL(safePath, base).toString();
 	}
 
 	// Base to resolve relative paths against
@@ -87,7 +130,11 @@ export function getCaseManagementLoginUrl(role?: CaseRole): string {
 	};
 
 	const chosenRaw = explicit || generic || "/login";
-	const urlObj = buildUrl(chosenRaw) || new URL("/login", base);
+	let urlObj = buildUrl(chosenRaw) || new URL("/login", base);
+	if (isProductionSite && isLoopbackHostname(urlObj.hostname)) {
+		const localPath = role === "CITIZEN" ? "/login/citizen" : "/login";
+		urlObj = new URL(`/case-management${localPath}`, window.location.origin);
+	}
 
 	// Ensure role is passed as a query param so the target can select correct flow
 	if (role) urlObj.searchParams.set("role", role);

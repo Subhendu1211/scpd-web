@@ -255,13 +255,15 @@ if (
   );
 }
 
-console.debug("Postgres connection details:", {
-  host: connectionHost,
-  database: resolvedDatabase,
-  usingConnectionString: Boolean(connectionString),
-  connectionStringSource,
-  ssl: Boolean(fallbackSsl),
-});
+if (process.env.NODE_ENV !== "production") {
+  console.debug("Postgres connection details:", {
+    host: connectionHost,
+    database: resolvedDatabase,
+    usingConnectionString: Boolean(connectionString),
+    connectionStringSource,
+    ssl: Boolean(fallbackSsl),
+  });
+}
 
 const pool =
   (parsedKeyValueConfig
@@ -306,9 +308,17 @@ pool.on("release", (_error, client) => {
 
 export async function checkDbHealth() {
   const result = await pool.query(
-    "SELECT current_database() AS database, current_user AS username",
+    `SELECT current_database() AS database,
+            current_user AS username,
+            to_regclass('public.admin_users') IS NOT NULL AS has_admin_users,
+            to_regclass('public.cms_menu_items') IS NOT NULL AS has_cms_menu,
+            to_regclass('public.cms_pages') IS NOT NULL AS has_cms_pages`,
   );
-  return result.rows[0] || null;
+  const status = result.rows[0];
+  if (!status?.has_admin_users || !status?.has_cms_menu || !status?.has_cms_pages) {
+    throw new Error("Required SCPD website tables are not available.");
+  }
+  return status;
 }
 
 export function getDbRuntimeInfo() {

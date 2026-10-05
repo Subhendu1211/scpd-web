@@ -332,38 +332,36 @@ async function sendGovtSmsMessage({
           const statusCode = response.statusCode || "unknown";
           if (!(response.statusCode && response.statusCode >= 200 && response.statusCode < 300)) {
             console.error(
-              `[GOVT_SMS] HTTP_ERROR ${logMeta} status=${statusCode} body=${body}`,
+              `[GOVT_SMS] HTTP_ERROR ${logMeta} status=${statusCode}`,
             );
-            reject(
-              new Error(`Govt SMS failed: ${statusCode} ${body}`),
-            );
+            reject(new Error(`Govt SMS failed with status ${statusCode}.`));
             return;
           }
           try {
             const parsed = JSON.parse(body || "{}");
             if (String(parsed.status) === "1") {
               if (debugGatewayLog) {
-                console.info(`[GOVT_SMS] OK ${logMeta} status=${statusCode} body=${body}`);
+                console.info(`[GOVT_SMS] OK ${logMeta} status=${statusCode}`);
               }
               resolve();
               return;
             }
             console.error(
-              `[GOVT_SMS] PROVIDER_REJECT ${logMeta} status=${statusCode} body=${body}`,
+              `[GOVT_SMS] PROVIDER_REJECT ${logMeta} status=${statusCode}`,
             );
-            reject(new Error(parsed.message || "Govt SMS provider rejected the OTP."));
+            reject(new Error(`Govt SMS provider rejected the OTP with status ${statusCode}.`));
           } catch {
             if (/Message Send Successfully/i.test(body)) {
               if (debugGatewayLog) {
-                console.info(`[GOVT_SMS] OK ${logMeta} status=${statusCode} body=${body}`);
+                console.info(`[GOVT_SMS] OK ${logMeta} status=${statusCode}`);
               }
               resolve();
               return;
             }
             console.error(
-              `[GOVT_SMS] UNEXPECTED_RESPONSE ${logMeta} status=${statusCode} body=${body}`,
+              `[GOVT_SMS] UNEXPECTED_RESPONSE ${logMeta} status=${statusCode}`,
             );
-            reject(new Error(`Govt SMS returned an unexpected response: ${body}`));
+            reject(new Error(`Govt SMS returned an unexpected response with status ${statusCode}.`));
           }
         });
       },
@@ -371,7 +369,7 @@ async function sendGovtSmsMessage({
 
     request.on("error", (error) => {
       console.error(
-        `[GOVT_SMS] NETWORK_ERROR ${logMeta} error=${error?.message || error}`,
+        `[GOVT_SMS] NETWORK_ERROR ${logMeta} code=${error?.code || "unknown"}`,
       );
       reject(error);
     });
@@ -619,8 +617,8 @@ async function sendEmailOtp({ destination, code }) {
 async function sendEmailMessage({ to, subject, text, strictInProduction = false }) {
   const transport = getEmailTransport();
   if (!transport) {
-    if (strictInProduction && isProduction) {
-      throw new Error("Email OTP delivery is not configured (set SMTP_HOST and SMTP_FROM)");
+    if (isProduction) {
+      throw new Error("Email delivery is not configured (set SMTP_HOST and SMTP_FROM)");
     }
     console.info(`[EMAIL] to=${to} subject="${subject}" text="${text}"`);
     return;

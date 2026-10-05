@@ -26,13 +26,6 @@ async function ensureTable(client) {
   // Allow drafts by permitting NULL published_at.
   await client.query(`ALTER TABLE whats_new ALTER COLUMN published_at DROP NOT NULL;`);
 
-  // Debug: log total rows in whats_new to help diagnose missing items
-  try {
-    const { rows: countRows } = await client.query(`SELECT count(*)::int AS cnt FROM whats_new`);
-    console.debug("whats-new: table row count", countRows?.[0]?.cnt ?? 0);
-  } catch (e) {
-    /* ignore */
-  }
 }
 
 export async function list(req, res, next) {
@@ -41,12 +34,6 @@ export async function list(req, res, next) {
   try {
     client = await pool.connect();
     await ensureTable(client);
-    // Debug: log request so we can trace 403/empty responses seen in browser
-    try {
-      console.debug("whats-new: request", { query: req.query, ip: req.ip, headers: req.headers?.host });
-    } catch (e) {
-      /* ignore logging errors */
-    }
     // Return all items for the public endpoint (admin saves should appear).
     // Note: earlier attempts to filter by `published_at <= now()` can hide
     // items due to timestamp vs timestamptz/timezone handling. We return
@@ -58,11 +45,6 @@ export async function list(req, res, next) {
         LIMIT $1`,
       [limit]
     );
-    try {
-      console.debug(`whats-new: returned ${rows.length} rows`);
-    } catch (e) {
-      /* ignore logging errors */
-    }
     res.json({ data: rows.map(mapRow) });
   } catch (error) {
     next(error);

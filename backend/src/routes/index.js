@@ -7,6 +7,7 @@ import * as userAuthController from "../controllers/userAuthController.js";
 import * as feedbackController from "../controllers/feedbackController.js";
 import { listSuccessStories } from "../services/adminSuccessStoriesService.js";
 import { body } from "express-validator";
+import rateLimit from "express-rate-limit";
 import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 
 // Simple fallback captions for the hero carousel when CMS content is absent
@@ -19,6 +20,20 @@ const SUCCESS_STORY_CAPTIONS = [
 ];
 
 const router = Router();
+const publicAuthRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many authentication requests. Please try again later." },
+});
+const publicSubmissionRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many submissions. Please try again later." },
+});
 
 /**
  * @swagger
@@ -48,43 +63,6 @@ router.get("/v1/success-stories-caption", (_req, res) => {
 
 /**
  * @swagger
- * /news:
- *   post:
- *     tags: [Public]
- *     summary: Create a new news item
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             additionalProperties: true
- *     responses:
- *       200:
- *         description: News item created
- */
-router.post("/news", newsController.create);
-
-/**
- * @swagger
- * /news/:id:
- *   delete:
- *     tags: [Public]
- *     summary: Delete a news item
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *         required: true
- *     responses:
- *       200:
- *         description: News item deleted
- */
-router.delete("/news/:id", newsController.remove);
-
-/**
- * @swagger
  * /grievances:
  *   post:
  *     tags: [Public]
@@ -100,10 +78,11 @@ router.delete("/news/:id", newsController.remove);
  *       200:
  *         description: Grievance submitted
  */
-router.post("/grievances", grievancesController.submit);
+router.post("/grievances", publicSubmissionRateLimiter, grievancesController.submit);
 
 router.post(
   "/feedback",
+  publicSubmissionRateLimiter,
   [
     body("name")
       .isString()
@@ -200,6 +179,7 @@ router.get("/cms/tables/:tableName", cmsController.getPublicTable);
 // Public user auth
 router.post(
   "/auth/signup",
+  publicAuthRateLimiter,
   [
     body("fullName").isLength({ min: 2 }).withMessage("Full name is required"),
     body("email").isEmail().withMessage("Valid email is required"),
@@ -221,6 +201,7 @@ router.post(
 
 router.post(
   "/auth/login",
+  publicAuthRateLimiter,
   [
     body("email").isEmail().withMessage("Valid email is required"),
     body("password")
@@ -236,6 +217,7 @@ router.post(
 
 router.post(
   "/auth/login/verify-otp",
+  publicAuthRateLimiter,
   [
     body("challengeId").isString().notEmpty().withMessage("challengeId is required"),
     body("otp")

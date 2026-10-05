@@ -9,6 +9,7 @@ frontend/dist
 *.log
 npm-debug.log*
 
+backend/.env
 backend/uploads
 uploads
 
@@ -17,4 +18,6 @@ backend/build_errors.txt
 backend/check_output.txt
 backend/debug_output.txt
 backend/setup_error_full.txt
+frontend/.env.local
+frontend/.env.*.local
 frontend/lint_output.txt

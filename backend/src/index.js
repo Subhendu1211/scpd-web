@@ -15,12 +15,8 @@ import {
   ensureCmsMediaFileChunksTable,
   ensureCmsMediaFileBytesColumn,
 } from "./models/ensureSchema.js";
-import { checkDbHealth, getDbRuntimeInfo } from "./models/db.js";
+import { checkDbHealth } from "./models/db.js";
 import { fetchMediaBinaryByFileName } from "./services/adminMediaService.js";
-import {
-  isGovtSmsConfigured,
-  isTwilioVerifyConfigured,
-} from "./services/notificationService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,24 +35,19 @@ if (shouldLoadDotenv) {
   dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 }
 
-// Debug: print DB environment so we can verify which Postgres instance we're using
-try {
-  console.debug("DB env:", {
-    DB_NAME: process.env.DB_NAME || process.env.PGDATABASE,
-    DB_HOST: process.env.DB_HOST || process.env.PGHOST,
-    DB_PORT: process.env.DB_PORT || process.env.PGPORT,
-    DB_USER: process.env.DB_USER || process.env.PGUSER,
-    DB_SSL: process.env.DB_SSL,
-  });
-} catch (e) {
-  /* ignore */
+if (process.env.NODE_ENV === "production") {
+  const jwtSecret = String(process.env.JWT_SECRET || "");
+  if (jwtSecret.length < 32 || /^(change[-_ ]?me|secret|password)/i.test(jwtSecret)) {
+    throw new Error("JWT_SECRET must be a unique secret of at least 32 characters in production.");
+  }
 }
 
 const app = express();
+let startupReady = false;
 
 app.disable("x-powered-by");
 
-// Trust the first reverse proxy (Nginx) so that express-rate-limit
+// Trust the first reverse proxy (Caddy in the combined production stack) so that express-rate-limit
 // can correctly identify real client IPs via X-Forwarded-For.
 app.set("trust proxy", 1);
 
@@ -97,7 +88,7 @@ app.use((_req, res, next) => {
       "base-uri 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
-      "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://platform.twitter.com https://translate.google.com",
+      "script-src 'self' 'unsafe-inline' https://platform.twitter.com https://translate.google.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
@@ -122,42 +113,32 @@ const corsOrigins = corsOriginsEnv
       .filter(Boolean)
   : null;
 
-app.use(
-  cors({
-    origin: corsOrigins ?? true,
-    credentials: false,
-  }),
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors((req, callback) => {
+  const origin = req.header("origin");
+  if (!origin) return callback(null, { origin: false });
+
+  const forwardedProto = req.header("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = req.header("host");
+  const requestOrigin = host ? `${forwardedProto || req.protocol}://${host}` : null;
+  const allowedByConfig = corsOrigins?.includes(origin) ||
+    (process.env.NODE_ENV !== "production" && corsOrigins?.includes("*"));
+  const allowed = origin === requestOrigin || allowedByConfig;
+
+  callback(null, { origin: allowed ? origin : false, credentials: false });
+}));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb", parameterLimit: 1000 }));
 
 app.get("/api/health", async (_req, res) => {
-  const runtime = getDbRuntimeInfo();
+  if (!startupReady) {
+    return res.status(503).json({ ok: false });
+  }
   try {
-    const db = await checkDbHealth();
-    return res.json({
-      ok: true,
-      notifications: {
-        govtSmsConfigured: isGovtSmsConfigured(),
-        twilioVerifyConfigured: isTwilioVerifyConfigured(),
-      },
-      db: {
-        connected: true,
-        database: db?.database || null,
-        user: db?.username || null,
-        runtime,
-      },
-    });
+    await checkDbHealth();
+    return res.json({ ok: true });
   } catch (error) {
     console.error("Health check DB error:", error?.message || error);
-    return res.status(503).json({
-      ok: false,
-      db: {
-        connected: false,
-        runtime,
-        errorCode: error?.code || null,
-      },
-    });
+    return res.status(503).json({ ok: false });
   }
 });
 app.use("/api", apiRouter);
@@ -209,20 +190,19 @@ app.use((err, _req, res, _next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
       const configuredMediaMaxFileSize = Number(process.env.MEDIA_MAX_FILE_SIZE);
-      if (Number.isFinite(configuredMediaMaxFileSize) && configuredMediaMaxFileSize > 0) {
-        const maxMb = Math.round(configuredMediaMaxFileSize / (1024 * 1024));
-        return res
-          .status(413)
-          .json({ error: `File too large. Maximum upload size is ${maxMb} MB.` });
-      }
-      return res
-        .status(413)
-        .json({ error: "File too large." });
+      const maxBytes = Number.isFinite(configuredMediaMaxFileSize) && configuredMediaMaxFileSize > 0
+        ? Math.min(configuredMediaMaxFileSize, 100 * 1024 * 1024)
+        : 100 * 1024 * 1024;
+      const maxMb = Math.ceil(maxBytes / (1024 * 1024));
+      return res.status(413).json({ error: `File too large. Maximum upload size is ${maxMb} MB.` });
     }
     return res.status(400).json({ error: err.message || "Upload failed" });
   }
   if (err?.type === "entity.parse.failed" || err instanceof SyntaxError) {
     return res.status(400).json({ error: "Invalid JSON payload." });
+  }
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ error: "Request body is too large." });
   }
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
@@ -230,9 +210,31 @@ app.use((err, _req, res, _next) => {
 
 const PORT = process.env.PORT || 4000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
 });
+
+let isShuttingDown = false;
+async function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.info(`Received ${signal}; closing HTTP server and database pool.`);
+  server.close(async (error) => {
+    if (error) {
+      console.error("HTTP server shutdown failed:", error.message);
+      process.exitCode = 1;
+    }
+    try {
+      const { pool } = await import("./models/db.js");
+      await pool.end();
+    } catch (poolError) {
+      console.error("Database pool shutdown failed:", poolError?.message || poolError);
+      process.exitCode = 1;
+    }
+  });
+}
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));
 
 // Run schema/bootstrap tasks in background.
 // In cloud environments, hard-failing process startup causes generic App Service
@@ -244,6 +246,7 @@ app.listen(PORT, () => {
     await ensureCmsMediaFileBytesColumn();
     await ensureCmsMediaFileChunksTable();
     await ensureCmsMediaCaptionTextColorColumn();
+    startupReady = true;
   } catch (error) {
     console.error("Startup bootstrap warning (server still running):", error);
   }
